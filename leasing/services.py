@@ -87,6 +87,7 @@ def post_receipt(receipt_id):
     cash=Account.objects.filter(company=receipt.company,code=receipt.cash_account_code,is_active=True).first()
     ar=Account.objects.filter(company=receipt.company,code="1200",is_active=True).first()
     if not cash or not ar: raise ValidationError("Cash/bank or receivables account missing; seed chart of accounts first.")
+    if not cash.allow_manual_posting: raise ValidationError("Configured cash/bank account does not permit this posting workflow.")
     key=f"receipt:{receipt.pk}"
     entry,created=JournalEntry.objects.get_or_create(company=receipt.company,idempotency_key=key,defaults={"entry_number":f"RCPT-{receipt.receipt_number}","entry_date":receipt.receipt_date,"description":f"Receipt {receipt.receipt_number} / {receipt.tenant.display_name}","source_type":"receipt","source_id":str(receipt.pk),"status":"draft"})
     if created:
