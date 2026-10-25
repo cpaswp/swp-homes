@@ -1,0 +1,2 @@
+{% extends 'core/base.html' %}
+{% block content %}<section class="empty-page"><div class="empty-icon">⌂</div><h1>{% if language == 'ar' %}لا توجد شركة مرتبطة بحسابك{% else %}No company assigned{% endif %}</h1><p>{% if language == 'ar' %}اطلب من مسؤول النظام إضافتك إلى شركة ومنحك الدور المناسب.{% else %}Ask your system administrator to add you to a company and assign the appropriate role.{% endif %}</p></section>{% endblock %}

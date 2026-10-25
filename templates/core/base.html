@@ -1,0 +1,47 @@
+{% load i18n static %}
+<!doctype html>
+<html lang="{{ language|default:'ar' }}" dir="{% if language == 'ar' %}rtl{% else %}ltr{% endif %}">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="theme-color" content="#05080f">
+  <title>{% block title %}SWP-HOMES{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+  <header class="swp-header">
+    <div class="tenant-brand">
+      {% if active_company and active_company.logo %}<img class="tenant-logo" src="{{ active_company.logo.url }}" alt="{% if language == 'ar' %}شعار الشركة{% else %}Company logo{% endif %}">
+      {% else %}<span class="tenant-logo-fallback">⌂</span>{% endif %}
+      <div class="tenant-brand-copy"><strong>{% if active_company %}{{ active_company.name }}{% else %}{% if language == 'ar' %}الشركة المستخدمة{% else %}Your company{% endif %}{% endif %}</strong>
+      {% if active_company and active_company.legal_name %}<small>{{ active_company.legal_name }}</small>{% endif %}</div>
+    </div>
+    <a class="swp-platform-brand" href="{% url 'dashboard' %}" aria-label="SWP-HOMES">
+      <img src="{% static 'images/swp-logo.png' %}" alt="SWP logo" class="swp-logo"><span class="swp-product-name">SWP-HOMES</span>
+    </a>
+    <div class="top-actions">
+      {% if request.user.is_authenticated %}<span class="user-chip">{{ request.user.get_username }}</span>{% endif %}
+      <form action="{% url 'set_language' %}" method="post" class="language-form">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="language" value="{% if language == 'ar' %}en{% else %}ar{% endif %}"><button class="language-button" type="submit">{% if language == 'ar' %}English{% else %}العربية{% endif %}</button></form>
+      {% if request.user.is_authenticated %}<form action="{% url 'logout' %}" method="post">{% csrf_token %}<button class="quiet-button" type="submit">{% if language == 'ar' %}تسجيل الخروج{% else %}Sign out{% endif %}</button></form>{% endif %}
+    </div>
+  </header>
+  <div class="shell"><aside class="sidebar">
+    <div class="nav-caption">{% if language == 'ar' %}مساحة العمل{% else %}WORKSPACE{% endif %}</div>
+    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}"><span>▦</span>{% if language == 'ar' %}لوحة التحكم{% else %}Dashboard{% endif %}</a>
+    <div class="nav-caption spacer-caption">{% if language == 'ar' %}إدارة الأصول{% else %}ASSET MANAGEMENT{% endif %}</div>
+    <a class="nav-link {% if 'propert' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'property_list' %}"><span>⌂</span>{% if language == 'ar' %}العقارات{% else %}Properties{% endif %}</a>
+    <a class="nav-link {% if 'unit' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'unit_list' %}"><span>▦</span>{% if language == 'ar' %}الوحدات{% else %}Units{% endif %}</a>
+    <div class="nav-caption spacer-caption">{% if language == 'ar' %}الأنظمة المالية{% else %}FINANCE{% endif %}</div>
+    <a class="nav-link {% if 'lease' in request.resolver_match.url_name or 'charge' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'lease_list' %}"><span>▤</span>{% if language == 'ar' %}عقود الإيجار{% else %}Leases{% endif %}</a>
+    <a class="nav-link" href="{% url 'lease_charges' %}"><span>◷</span>{% if language == 'ar' %}جدول الاستحقاقات{% else %}Charge schedule{% endif %}</a>
+    <a class="nav-link" href="{% url 'receipt_list' %}"><span>↙</span>{% if language == 'ar' %}سندات القبض{% else %}Receipts{% endif %}</a>
+    <a class="nav-link" href="{% url 'trial_balance' %}"><span>▤</span>{% if language == 'ar' %}ميزان المراجعة{% else %}Trial balance{% endif %}</a>
+    <a class="nav-link" href="{% url 'general_ledger' %}"><span>≡</span>{% if language == 'ar' %}الأستاذ العام{% else %}General ledger{% endif %}</a>
+    <a class="nav-link" href="{% url 'income_statement' %}"><span>↗</span>{% if language == 'ar' %}قائمة الدخل{% else %}Income statement{% endif %}</a>
+    <a class="nav-link" href="{% url 'balance_sheet' %}"><span>▥</span>{% if language == 'ar' %}الميزانية العمومية{% else %}Balance sheet{% endif %}</a>
+    <div class="nav-link muted"><span>◫</span>{% if language == 'ar' %}المحاسبة والبنوك{% else %}Accounting & Banking{% endif %}<small>{% if language == 'ar' %}قيد التطوير{% else %}In progress{% endif %}</small></div>
+    <div class="sidebar-footer">SWP-HOMES · {% if language == 'ar' %}نسخة تطوير{% else %}Development build{% endif %}</div>
+  </aside><main class="main-content">
+    {% if messages %}<div class="messages">{% for message in messages %}<div class="message message-{{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main></div>
+</body></html>
