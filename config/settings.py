@@ -29,14 +29,8 @@ TEMPLATES = [{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS"
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 url = os.getenv("DATABASE_URL", "").strip()
-if url:
-    database_config = dj_database_url.parse(url, conn_max_age=60)
-    # Local CI/PostgreSQL services often run without SSL; require SSL for remote DBs in production.
-    if not DEBUG and database_config.get("HOST") not in {"localhost", "127.0.0.1", "::1"}:
-        database_config.setdefault("OPTIONS", {})["sslmode"] = "require"
-    DATABASES = {"default": database_config}
-else:
-    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
+DATABASES = {"default": dj_database_url.parse(url, conn_max_age=60, ssl_require=not DEBUG)} if url else {
+"default":{"ENGINE":"django.db.backends.sqlite3","NAME":BASE_DIR / "db.sqlite3"}}
 AUTH_PASSWORD_VALIDATORS = [
 {"NAME":"django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
 {"NAME":"django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -55,7 +49,7 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "staticfiles": {"BACKEND": "config.storage.NonStrictCompressedManifestStaticFilesStorage"},
 }
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 DJANGO_ENV = os.getenv("DJANGO_ENV", "development").strip().lower()
