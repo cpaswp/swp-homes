@@ -41,7 +41,7 @@ def post_journal_entry(entry_id):
         if not line.account.is_active:
             raise PostingError("Cannot post to an inactive account.")
         if not line.account.allow_manual_posting and entry.source_type not in {"receipt", "lease_charge", "vendor_bill", "payment_voucher", "owner_payout", "opening_balance", "system_reversal"}:
-            raise PostingError("Cannot post manually to a control account; use an approved source workflow.")
+            raise PostingError("Account disallows manual posting; use an approved source workflow.")
     entry.status = "posted"
     entry.posted_at = timezone.now()
     entry.save(update_fields=["status","posted_at","updated_at"])
