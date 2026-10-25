@@ -7,6 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
+DJANGO_ENV = os.getenv("DJANGO_ENV", "development").strip().lower()
 ALLOWED_HOSTS = [v.strip() for v in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if v.strip()]
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
@@ -29,7 +30,6 @@ TEMPLATES = [{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS"
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 url = os.getenv("DATABASE_URL", "").strip()
-DJANGO_ENV = os.getenv("DJANGO_ENV", "development").strip().lower()
 DATABASES = {"default": dj_database_url.parse(url, conn_max_age=60, ssl_require=(DJANGO_ENV == "production"))} if url else {
 "default":{"ENGINE":"django.db.backends.sqlite3","NAME":BASE_DIR / "db.sqlite3"}}
 AUTH_PASSWORD_VALIDATORS = [
@@ -52,6 +52,11 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+# Keep tests/development usable before collectstatic has generated the manifest.
+# Production remains strict by default so missing deployed assets are not hidden.
+WHITENOISE_MANIFEST_STRICT = os.getenv(
+    "WHITENOISE_MANIFEST_STRICT", "true" if DJANGO_ENV == "production" else "false"
+).lower() == "true"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 if DJANGO_ENV == "production":
     if not os.getenv("DJANGO_SECRET_KEY") or os.getenv("DJANGO_SECRET_KEY") == "dev-only-change-me":
