@@ -1,0 +1,38 @@
+name: SWP-HOMES checks
+on:
+  push:
+  pull_request:
+jobs:
+  django-checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: swp_homes_test
+          POSTGRES_USER: swp_homes
+          POSTGRES_PASSWORD: swp_homes_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U swp_homes -d swp_homes_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DJANGO_ENV: development
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: ci-only-not-a-production-secret
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      DATABASE_URL: postgres://swp_homes:swp_homes_test_password@127.0.0.1:5432/swp_homes_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py migrate --noinput
+      - run: pytest -q
