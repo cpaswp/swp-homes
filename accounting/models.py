@@ -51,5 +51,5 @@ class JournalLine(TimeStampedModel):
     currency = models.CharField(max_length=3, default="EGP")
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=~(models.Q(debit__gt=0) & models.Q(credit__gt=0)), name="ck_journal_line_not_both_sides"),
+            models.CheckConstraint(condition=models.Q(models.Q(("debit__gt", 0), ("credit__gt", 0)), _negated=True), name="ck_journal_line_not_both_sides"),
             models.CheckConstraint(condition=models.Q(debit__gte=0) & models.Q(credit__gte=0), name="ck_journal_line_nonnegative")]
