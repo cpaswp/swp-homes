@@ -1,0 +1,9 @@
+{% load static %}
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#05080f"><title>دخول آمن · SWP-HOMES</title><link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
+<body class="login-body"><main class="login-card">
+  <div class="login-platform"><img src="{% static 'images/swp-logo.png' %}" alt="SWP" class="login-logo"><strong>SWP-HOMES</strong></div>
+  <h1 class="login-title">تسجيل الدخول</h1><p class="login-intro">منصة إدارة الأملاك والحسابات</p>
+  {% if form.errors %}<div class="form-error">اسم المستخدم أو كلمة المرور غير صحيحة.</div>{% endif %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><label for="id_username">اسم المستخدم</label>{{ form.username }}<label for="id_password">كلمة المرور</label>{{ form.password }}<button class="primary-button" type="submit">دخول آمن</button></form>
+  <p class="login-footnote">يقتصر الوصول على المستخدمين المصرح لهم.</p>
+</main></body></html>
