@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 import dj_database_url
 from dotenv import load_dotenv
 
@@ -29,7 +30,7 @@ TEMPLATES = [{"BACKEND":"django.template.backends.django.DjangoTemplates","DIRS"
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 url = os.getenv("DATABASE_URL", "").strip()
-DATABASES = {"default": dj_database_url.parse(url, conn_max_age=60, ssl_require=(not DEBUG and os.getenv("DJANGO_ENV", "development").lower() == "production"))} if url else {
+DATABASES = {"default": dj_database_url.parse(url, conn_max_age=60, ssl_require=(not DEBUG and os.getenv("DJANGO_ENV", "development").lower() == "production" and urlparse(url).hostname not in {"localhost", "127.0.0.1", "::1"}))} if url else {
 "default":{"ENGINE":"django.db.backends.sqlite3","NAME":BASE_DIR / "db.sqlite3"}}
 AUTH_PASSWORD_VALIDATORS = [
 {"NAME":"django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
