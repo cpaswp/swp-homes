@@ -87,6 +87,6 @@ def post_receipt(receipt_id):
         JournalLine.objects.create(entry=entry,account=cash,description="Cash/bank received",debit=receipt.amount,credit=Decimal("0.00"),currency=receipt.currency)
         JournalLine.objects.create(entry=entry,account=ar,description="Tenant receivable cleared",debit=Decimal("0.00"),credit=receipt.amount,currency=receipt.currency)
     elif entry.status!="posted": raise ValidationError("A draft journal already exists for this receipt; administrator review is required.")
-    post_journal_entry(entry.pk)
+    entry = post_journal_entry(entry.pk)
     receipt.is_posted=True; receipt.save(update_fields=["is_posted","updated_at"])
     return entry
