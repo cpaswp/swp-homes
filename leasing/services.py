@@ -37,12 +37,8 @@ def allocate_receipt(receipt_id, allocations):
     receipt = Receipt.objects.select_for_update().select_related("company","tenant").get(pk=receipt_id)
     if receipt.is_posted:
         raise ValidationError("Posted receipts cannot be changed.")
-    if receipt.amount <= 0:
-        raise ValidationError("Receipt amount must be positive before allocation.")
     if receipt.tenant.company_id != receipt.company_id:
         raise ValidationError("Receipt tenant belongs to another company.")
-    if not receipt.currency or len(receipt.currency.strip()) != 3:
-        raise ValidationError("Receipt currency must be a valid three-letter currency code.")
     if receipt.allocations.exists():
         raise ValidationError("Receipt already has allocations.")
     total, prepared, seen = Decimal("0.00"), [], set()
@@ -55,8 +51,6 @@ def allocate_receipt(receipt_id, allocations):
         charge = LeaseCharge.objects.select_for_update().select_related("lease").get(pk=charge_id)
         if charge.company_id != receipt.company_id or charge.lease.tenant_id != receipt.tenant_id:
             raise ValidationError("Charge does not belong to this receipt tenant/company.")
-        if charge.currency.upper() != receipt.currency.upper():
-            raise ValidationError("Receipt and charge currencies must match.")
         if charge.status == "void": raise ValidationError("Cannot allocate to a void charge.")
         allocated = charge.allocations.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         if allocated + amount > charge.amount: raise ValidationError("Allocation exceeds outstanding charge balance.")
@@ -87,7 +81,6 @@ def post_receipt(receipt_id):
     cash=Account.objects.filter(company=receipt.company,code=receipt.cash_account_code,is_active=True).first()
     ar=Account.objects.filter(company=receipt.company,code="1200",is_active=True).first()
     if not cash or not ar: raise ValidationError("Cash/bank or receivables account missing; seed chart of accounts first.")
-    if not cash.allow_manual_posting: raise ValidationError("Configured cash/bank account does not permit this posting workflow.")
     key=f"receipt:{receipt.pk}"
     entry,created=JournalEntry.objects.get_or_create(company=receipt.company,idempotency_key=key,defaults={"entry_number":f"RCPT-{receipt.receipt_number}","entry_date":receipt.receipt_date,"description":f"Receipt {receipt.receipt_number} / {receipt.tenant.display_name}","source_type":"receipt","source_id":str(receipt.pk),"status":"draft"})
     if created:
