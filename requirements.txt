@@ -7,3 +7,4 @@ whitenoise>=6.9,<7
 pytest>=8.3,<9
 pytest-django>=4.11,<5
 Pillow>=11.0,<13.0
+gunicorn
