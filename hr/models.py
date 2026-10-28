@@ -1008,3 +1008,31 @@ class EmployeeBenefitEnrollment(models.Model):
         ordering = ["employee", "kind", "start_date"]
         verbose_name = "اشتراك مزايا موظف"
         verbose_name_plural = "مزايا الموظفين"
+
+
+class AttendanceDeviceConfiguration(models.Model):
+    class ConnectionType(models.TextChoices):
+        LAN = 'lan', 'شبكة LAN / عنوان IP'
+        USB = 'usb', 'USB عبر برنامج وسيط'
+        SOFTWARE = 'software', 'برنامج وسيط / SDK'
+        FILE = 'file', 'استيراد ملف'
+        CLOUD = 'cloud', 'خدمة سحابية / API'
+    name = models.CharField('اسم تعريفي للماكينة', max_length=120, default='ماكينة الحضور الرئيسية')
+    manufacturer = models.CharField('الشركة المصنعة', max_length=160)
+    model_name = models.CharField('موديل الجهاز', max_length=160)
+    connection_type = models.CharField('طريقة الاتصال', max_length=20, choices=ConnectionType.choices, default=ConnectionType.LAN)
+    ip_address = models.GenericIPAddressField('عنوان IP', null=True, blank=True)
+    port = models.PositiveIntegerField('المنفذ', null=True, blank=True)
+    site_name = models.CharField('موقع الجهاز / الفرع', max_length=160, blank=True)
+    protocol_or_software = models.CharField('البروتوكول أو البرنامج الوسيط', max_length=160, blank=True)
+    external_device_id = models.CharField('معرف الجهاز الخارجي', max_length=120, blank=True)
+    enabled = models.BooleanField('تفعيل التكامل', default=False)
+    notes = models.TextField('ملاحظات', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering = ['manufacturer', 'model_name']
+        verbose_name = 'إعداد ماكينة حضور'
+        verbose_name_plural = 'إعدادات ماكينات الحضور'
+    def __str__(self):
+        return f'{self.manufacturer} {self.model_name} — {self.name}'
