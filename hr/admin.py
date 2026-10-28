@@ -53,5 +53,5 @@ admin.site.register([
     EmployeeAuditEvent, PositionAssignment, AdvancePolicy, EmployeeAdvance, CustodyAssignment,
     EmployeeContract, EmployeeWarning, EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
     OfferLetter, EmployeeDependent, EmployeeMedicalBenefit, EmployeeHousingAssignment,
-    EmployeeChildcareBenefit, EmployeeBenefitEnrollment, AttendanceDeviceConfiguration,
+    EmployeeChildcareBenefit, EmployeeBenefitEnrollment, AttendanceDeviceConfiguration, RegulationRule, HiringDocumentTemplate,
 ])
