@@ -53,3 +53,6 @@ See `PHASE2_STATUS_AR.md` for the exact implemented scope and verification limit
 
 ## Phase 5 — Accounting reports
 See `PHASE5_REPORTS_STATUS_AR.md`. Reports are derived from posted journals and should not be used for statutory reporting until the full accounting workflow, opening balances, cash-flow classifications and Django tests are completed.
+
+## دليل النشر الآمن
+راجع [دليل النشر الآمن بالعربية](DEPLOYMENT_RUNBOOK_AR.md) لإعداد متغيرات البيئة، وبناء Docker، وتنفيذ الترحيلات بأمان، والتحقق بعد النشر.
