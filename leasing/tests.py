@@ -53,7 +53,7 @@ def test_receipt_allocation_rejects_currency_mismatch():
     p = Property.objects.create(company=c, code="P1", name="عقار", kind="residential", ownership_type="company_owned")
     u = Unit.objects.create(company=c, property=p, code="U1", kind="apartment")
     lease = Lease.objects.create(company=c, lease_number="L-CUR", unit=u, tenant=tenant,
-        start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), rent_amount=Decimal("100.00"))
+        start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), rent_amount=Decimal("100.00"), currency="USD")
     charge = LeaseCharge.objects.create(company=c, lease=lease, due_date=date(2026, 1, 1),
         amount=Decimal("100.00"), currency="USD")
     receipt = Receipt.objects.create(company=c, receipt_number="R-CUR", tenant=tenant,
