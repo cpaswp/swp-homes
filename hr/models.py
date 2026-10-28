@@ -831,3 +831,180 @@ class TargetAchievement(models.Model):
         ordering = ["period_start"]
         verbose_name = "إنجاز مستهدف"
         verbose_name_plural = "الإنجاز الفعلي للمستهدفات"
+
+
+
+class OfferLetter(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        PENDING = "pending", "بانتظار الاعتماد"
+        APPROVED = "approved", "معتمد للإرسال"
+        SENT = "sent", "تم الإرسال"
+        ACCEPTED = "accepted", "مقبول"
+        DECLINED = "declined", "مرفوض"
+        EXPIRED = "expired", "منتهي"
+        CONVERTED = "converted", "تم التعيين"
+    candidate = models.ForeignKey(RecruitmentCandidate, verbose_name="المرشح", on_delete=models.PROTECT, null=True, blank=True, related_name="offer_letters")
+    employee = models.ForeignKey(Employee, verbose_name="الموظف الناتج", on_delete=models.PROTECT, null=True, blank=True, related_name="offer_letters")
+    offer_code = models.CharField("رقم عرض العمل", max_length=40, unique=True)
+    job_title = models.CharField("المسمى الوظيفي المعروض", max_length=160)
+    department = models.ForeignKey(Department, verbose_name="الإدارة", on_delete=models.PROTECT, null=True, blank=True)
+    employment_type = models.CharField("نوع التعاقد", max_length=40, default="full_time")
+    proposed_start_date = models.DateField("تاريخ بدء العمل المقترح", null=True, blank=True)
+    offer_valid_until = models.DateField("العرض صالح حتى")
+    basic_salary = models.DecimalField("الراتب الأساسي المعروض", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    allowances = models.DecimalField("البدلات الشهرية المعروضة", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    bonus_terms = models.TextField("شروط المكافآت والحوافز", blank=True)
+    benefits_summary = models.TextField("ملخص المزايا", blank=True)
+    probation_months = models.PositiveSmallIntegerField("فترة الاختبار بالشهور", default=3)
+    work_location = models.CharField("مقر العمل", max_length=180, blank=True)
+    terms = models.TextField("الشروط والأحكام", blank=True)
+    document = models.FileField("نسخة العرض", upload_to="hr/offers/%Y/%m/", blank=True)
+    approval_request = models.ForeignKey(ApprovalRequest, verbose_name="طلب الاعتماد", on_delete=models.PROTECT, null=True, blank=True, related_name="offer_letters")
+    sent_at = models.DateTimeField("تاريخ الإرسال", null=True, blank=True)
+    responded_at = models.DateTimeField("تاريخ الرد", null=True, blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    notes = models.TextField("ملاحظات داخلية", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "عرض عمل"
+        verbose_name_plural = "عروض العمل"
+
+
+class EmployeeDependent(models.Model):
+    class Relationship(models.TextChoices):
+        SPOUSE = "spouse", "زوج/زوجة"
+        CHILD = "child", "ابن/ابنة"
+        PARENT = "parent", "والد/والدة"
+        OTHER = "other", "أخرى"
+    employee = models.ForeignKey(Employee, verbose_name="الموظف", on_delete=models.CASCADE, related_name="dependents")
+    full_name = models.CharField("اسم التابع", max_length=180)
+    relationship = models.CharField("صلة القرابة", max_length=20, choices=Relationship.choices)
+    date_of_birth = models.DateField("تاريخ الميلاد", null=True, blank=True)
+    national_id_last4 = models.CharField("آخر أربعة أرقام من الهوية (اختياري)", max_length=4, blank=True)
+    eligible_for_medical = models.BooleanField("مستحق للتغطية الطبية", default=False)
+    eligible_for_childcare = models.BooleanField("مستحق لمزايا الحضانة", default=False)
+    active = models.BooleanField("تابع نشط", default=True)
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["employee", "full_name"]
+        verbose_name = "تابع موظف"
+        verbose_name_plural = "أفراد أسر الموظفين"
+    def __str__(self):
+        return f"{self.full_name} — {self.employee.employee_code}"
+
+
+class EmployeeMedicalBenefit(models.Model):
+    class Kind(models.TextChoices):
+        PLAN = "plan", "اشتراك/تغطية طبية"
+        CLAIM = "claim", "مطالبة علاج"
+        REFUND = "refund", "رد مصروف علاجي"
+        EXAM = "exam", "فحص طبي"
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        PENDING = "pending", "بانتظار الاعتماد"
+        APPROVED = "approved", "معتمد"
+        REJECTED = "rejected", "مرفوض"
+        PAID = "paid", "تم الصرف"
+        CLOSED = "closed", "مغلق"
+    employee = models.ForeignKey(Employee, verbose_name="الموظف", on_delete=models.PROTECT, related_name="medical_benefits")
+    dependent = models.ForeignKey(EmployeeDependent, verbose_name="التابع (إن وجد)", on_delete=models.PROTECT, null=True, blank=True, related_name="medical_benefits")
+    kind = models.CharField("نوع المعاملة", max_length=20, choices=Kind.choices)
+    provider_name = models.CharField("مقدم الخدمة/شركة التأمين", max_length=180, blank=True)
+    policy_number = models.CharField("رقم الوثيقة", max_length=100, blank=True)
+    service_date = models.DateField("تاريخ الخدمة", null=True, blank=True)
+    amount_claimed = models.DecimalField("قيمة المطالبة", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    amount_approved = models.DecimalField("القيمة المعتمدة", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    currency = models.CharField("العملة", max_length=3, default="EGP")
+    reference_number = models.CharField("رقم المطالبة/المرجع", max_length=100, blank=True)
+    attachment = models.FileField("مستندات طبية/فواتير", upload_to="hr/medical/%Y/%m/", blank=True)
+    approval_request = models.ForeignKey(ApprovalRequest, verbose_name="طلب الاعتماد", on_delete=models.PROTECT, null=True, blank=True, related_name="medical_benefits")
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    confidential_notes = models.TextField("ملاحظات سرية", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "مزايا/مطالبة علاجية"
+        verbose_name_plural = "التأمين الطبي ومطالبات العلاج"
+
+
+class EmployeeHousingAssignment(models.Model):
+    class Status(models.TextChoices):
+        RESERVED = "reserved", "محجوز"
+        ACTIVE = "active", "مشغول"
+        ENDED = "ended", "منتهي"
+        CANCELLED = "cancelled", "ملغى"
+    employee = models.ForeignKey(Employee, verbose_name="الموظف", on_delete=models.PROTECT, related_name="housing_assignments")
+    housing_code = models.CharField("كود السكن/الوحدة", max_length=60)
+    address = models.TextField("عنوان السكن")
+    room_or_unit = models.CharField("الغرفة/الوحدة", max_length=80, blank=True)
+    start_date = models.DateField("من تاريخ")
+    end_date = models.DateField("حتى تاريخ", null=True, blank=True)
+    monthly_cost = models.DecimalField("التكلفة الشهرية", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    employee_contribution = models.DecimalField("مساهمة الموظف الشهرية", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    deposit_amount = models.DecimalField("التأمين المسترد", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    inventory_checklist = models.TextField("محضر حالة السكن والمحتويات", blank=True)
+    handover_document = models.FileField("محضر التسليم والاستلام", upload_to="hr/housing/%Y/%m/", blank=True)
+    approval_request = models.ForeignKey(ApprovalRequest, verbose_name="طلب الاعتماد", on_delete=models.PROTECT, null=True, blank=True, related_name="housing_assignments")
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.RESERVED)
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["-start_date"]
+        verbose_name = "تسكين موظف"
+        verbose_name_plural = "سكن الموظفين"
+
+
+class EmployeeChildcareBenefit(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        PENDING = "pending", "بانتظار الاعتماد"
+        APPROVED = "approved", "معتمد"
+        ACTIVE = "active", "ساري"
+        SUSPENDED = "suspended", "موقوف"
+        ENDED = "ended", "منتهي"
+        REJECTED = "rejected", "مرفوض"
+    employee = models.ForeignKey(Employee, verbose_name="الموظف", on_delete=models.PROTECT, related_name="childcare_benefits")
+    dependent = models.ForeignKey(EmployeeDependent, verbose_name="الطفل", on_delete=models.PROTECT, related_name="childcare_benefits")
+    provider_name = models.CharField("اسم الحضانة/مقدم الخدمة", max_length=180, blank=True)
+    provider_reference = models.CharField("كود مقدم الخدمة", max_length=80, blank=True)
+    start_date = models.DateField("من تاريخ")
+    end_date = models.DateField("حتى تاريخ", null=True, blank=True)
+    monthly_fee = models.DecimalField("التكلفة الشهرية", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    company_contribution = models.DecimalField("مساهمة الشركة", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    employee_contribution = models.DecimalField("مساهمة الموظف", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    approval_request = models.ForeignKey(ApprovalRequest, verbose_name="طلب الاعتماد", on_delete=models.PROTECT, null=True, blank=True, related_name="childcare_benefits")
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    notes = models.TextField("ملاحظات", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-start_date"]
+        verbose_name = "ميزة حضانة"
+        verbose_name_plural = "مزايا الحضانات"
+
+
+class EmployeeBenefitEnrollment(models.Model):
+    class Kind(models.TextChoices):
+        LIFE = "life", "تأمين على الحياة"
+        DISABILITY = "disability", "تأمين عجز"
+        TRANSPORT = "transport", "انتقالات"
+        MEALS = "meals", "وجبات"
+        PHONE = "phone", "بدل هاتف"
+        EDUCATION = "education", "تعليم الأبناء"
+        WELLNESS = "wellness", "رفاهية وصحة"
+        OTHER = "other", "أخرى"
+    employee = models.ForeignKey(Employee, verbose_name="الموظف", on_delete=models.PROTECT, related_name="benefit_enrollments")
+    kind = models.CharField("نوع الميزة", max_length=30, choices=Kind.choices)
+    provider = models.CharField("مقدم الخدمة", max_length=180, blank=True)
+    reference_number = models.CharField("رقم الوثيقة/الاشتراك", max_length=100, blank=True)
+    start_date = models.DateField("ساري من")
+    end_date = models.DateField("ساري حتى", null=True, blank=True)
+    company_cost = models.DecimalField("تكلفة الشركة", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    employee_cost = models.DecimalField("مساهمة الموظف", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    approval_request = models.ForeignKey(ApprovalRequest, verbose_name="طلب الاعتماد", on_delete=models.PROTECT, null=True, blank=True, related_name="benefit_enrollments")
+    active = models.BooleanField("نشطة", default=True)
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["employee", "kind", "start_date"]
+        verbose_name = "اشتراك مزايا موظف"
+        verbose_name_plural = "مزايا الموظفين"
