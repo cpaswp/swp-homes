@@ -277,3 +277,193 @@ def compliance_settings(request):
         "rule_types": RegulationRule.RuleType.choices,
         "document_categories": HiringDocumentTemplate.Category.choices,
     })
+
+
+from io import BytesIO
+from django.apps import apps
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db import transaction
+from django.http import HttpResponse
+from django.utils.dateparse import parse_date, parse_datetime
+from openpyxl import Workbook, load_workbook
+from .models import RecordAttachment
+
+EXCEL_EXCLUDED_MODELS = {"RecordAttachment"}
+def _excel_models():
+    return [m for m in apps.get_app_config("hr").get_models()
+            if m.__name__ not in EXCEL_EXCLUDED_MODELS and not m._meta.proxy]
+
+def _excel_fields(model):
+    fields = []
+    for field in model._meta.concrete_fields:
+        if field.primary_key or field.auto_created or field.name in ("created_at", "updated_at"):
+            continue
+        if field.many_to_one or field.one_to_one:
+            fields.append((field, field.attname))
+        elif field.get_internal_type() in ("FileField", "ImageField"):
+            continue
+        elif field.editable:
+            fields.append((field, field.name))
+    return fields
+
+@login_required
+@staff_member_required
+def excel_center(request):
+    model_list = _excel_models()
+    selected = request.GET.get("model") or request.POST.get("model") or ""
+    model = next((m for m in model_list if m.__name__ == selected), None)
+    if request.method == "POST" and request.FILES.get("workbook"):
+        if not model:
+            messages.error(request, "اختر الجدول المستهدف قبل الاستيراد.")
+            return redirect("hr:excel_center")
+        uploaded = request.FILES["workbook"]
+        if not uploaded.name.lower().endswith(".xlsx"):
+            messages.error(request, "يرجى رفع ملف Excel بصيغة .xlsx فقط.")
+            return redirect("hr:excel_center")
+        try:
+            workbook = load_workbook(uploaded, read_only=True, data_only=True)
+            sheet = workbook.active
+            rows = sheet.iter_rows(values_only=True)
+            headers = next(rows, None)
+            allowed = {field.name: field for field, _ in _excel_fields(model)}
+            if not headers:
+                raise ValueError("الملف فارغ.")
+            header_names = [str(x).strip() if x is not None else "" for x in headers]
+            unknown = [x for x in header_names if x and x not in allowed]
+            if unknown:
+                raise ValueError("أعمدة غير معروفة: " + ", ".join(unknown[:8]) + ". صدّر قالب الجدول أولًا.")
+            imported = 0
+            errors = []
+            with transaction.atomic():
+                for row_num, values in enumerate(rows, start=2):
+                    data = {header_names[i]: values[i] for i in range(min(len(header_names), len(values)))
+                            if i < len(header_names) and header_names[i] and values[i] is not None}
+                    if not data:
+                        continue
+                    try:
+                        obj_id = data.pop("id", None)
+                        if obj_id is not None and model._meta.pk.name not in data:
+                            obj = model.objects.select_for_update().get(pk=int(obj_id))
+                            for name, value in data.items():
+                                field = allowed[name]
+                                setattr(obj, name, _coerce_excel_value(field, value))
+                            obj.save()
+                        else:
+                            kwargs = {}
+                            for name, value in data.items():
+                                field = allowed[name]
+                                kwargs[name] = _coerce_excel_value(field, value)
+                            model.objects.create(**kwargs)
+                        imported += 1
+                    except Exception as exc:
+                        errors.append(f"صف {row_num}: {str(exc)[:220]}")
+                        if len(errors) >= 20:
+                            break
+                if errors:
+                    transaction.set_rollback(True)
+            workbook.close()
+            if errors:
+                messages.error(request, f"أُلغي الاستيراد بالكامل ولم تُحفظ أي تغييرات. عدد الأخطاء: {len(errors)}. " + " | ".join(errors[:5]))
+            else:
+                messages.success(request, f"تم استيراد / تحديث {imported} سجلًا بنجاح.")
+        except Exception as exc:
+            messages.error(request, f"تعذر قراءة الملف: {str(exc)[:300]}")
+        return redirect(f"{request.path}?model={selected}")
+    return render(request, "hr/excel_center.html", {
+        "models": [{"name": m.__name__, "label": m._meta.verbose_name_plural} for m in model_list],
+        "selected": selected,
+        "selected_label": model._meta.verbose_name_plural if model else "",
+        "fields": [{"name": f.name, "label": str(f.verbose_name)} for f, _ in _excel_fields(model)] if model else [],
+    })
+
+def _coerce_excel_value(field, value):
+    if value is None:
+        return None
+    if field.many_to_one or field.one_to_one:
+        return int(value)
+    internal = field.get_internal_type()
+    if internal in ("DateField",):
+        if hasattr(value, "date"):
+            return value.date()
+        return parse_date(str(value)[:10])
+    if internal in ("DateTimeField",):
+        if hasattr(value, "isoformat"):
+            return value
+        return parse_datetime(str(value))
+    if internal in ("BooleanField", "NullBooleanField"):
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() in ("1", "true", "yes", "نعم", "نعم ")
+    return value
+
+@login_required
+@staff_member_required
+def excel_export(request, model_name):
+    model = next((m for m in _excel_models() if m.__name__ == model_name), None)
+    if not model:
+        return HttpResponse("Unknown model", status=404)
+    fields = _excel_fields(model)
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Data"
+    headers = ["id"] + [f.name for f, _ in fields]
+    sheet.append(headers)
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+    for obj in model.objects.all().iterator():
+        values = [obj.pk]
+        for field, attr in fields:
+            value = getattr(obj, attr)
+            if hasattr(value, "isoformat"):
+                value = value.isoformat()
+            elif value is not None and not isinstance(value, (str, int, float, bool)):
+                value = str(value)
+            values.append(value)
+        sheet.append(values)
+    for col in sheet.columns:
+        letter = col[0].column_letter
+        sheet.column_dimensions[letter].width = min(max(max(len(str(cell.value or "")) for cell in col[:100]) + 2, 12), 36)
+    buffer = BytesIO()
+    workbook.save(buffer)
+    response = HttpResponse(buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="{model.__name__.lower()}_export.xlsx"'
+    return response
+
+@login_required
+@staff_member_required
+def record_attachments(request):
+    model_list = _excel_models()
+    model_name = request.GET.get("model", "")
+    object_id = request.GET.get("object_id", "")
+    selected_model = next((m for m in model_list if m.__name__ == model_name), None)
+    target = None
+    if selected_model and object_id:
+        target = get_object_or_404(selected_model, pk=object_id)
+    if request.method == "POST":
+        model_name = request.POST.get("model", "")
+        object_id = request.POST.get("object_id", "")
+        selected_model = next((m for m in model_list if m.__name__ == model_name), None)
+        if not selected_model or not object_id:
+            messages.error(request, "حدد نوع السجل ورقمه.")
+        elif not request.FILES.get("file"):
+            messages.error(request, "اختر ملفًا لإرفاقه.")
+        else:
+            target = get_object_or_404(selected_model, pk=object_id)
+            RecordAttachment.objects.create(
+                content_object=target,
+                title=request.POST.get("title", "").strip() or request.FILES["file"].name,
+                file=request.FILES["file"],
+                category=request.POST.get("category", "").strip(),
+                issue_date=parse_date(request.POST.get("issue_date", "")) if request.POST.get("issue_date") else None,
+                expiry_date=parse_date(request.POST.get("expiry_date", "")) if request.POST.get("expiry_date") else None,
+                notes=request.POST.get("notes", "").strip(),
+                uploaded_by=request.user,
+            )
+            messages.success(request, "تم إرفاق المستند بالسجل.")
+            return redirect(f"{request.path}?model={model_name}&object_id={object_id}")
+    attachments = RecordAttachment.objects.filter(content_type__model=selected_model._meta.model_name, object_id=object_id) if target else RecordAttachment.objects.none()
+    return render(request, "hr/record_attachments.html", {
+        "models": [{"name": m.__name__, "label": m._meta.verbose_name_plural} for m in model_list],
+        "selected_model": model_name, "object_id": object_id, "target": target, "attachments": attachments,
+    })
