@@ -51,7 +51,10 @@ def allocate_receipt(receipt_id, allocations):
         charge = LeaseCharge.objects.select_for_update().select_related("lease").get(pk=charge_id)
         if charge.company_id != receipt.company_id or charge.lease.tenant_id != receipt.tenant_id:
             raise ValidationError("Charge does not belong to this receipt tenant/company.")
-        if charge.status == "void": raise ValidationError("Cannot allocate to a void charge.")
+        if receipt.currency.upper() != charge.currency.upper():
+            raise ValidationError("Receipt and charge currencies must match.")
+        if charge.status == "void":
+            raise ValidationError("Cannot allocate to a void charge.")
         allocated = charge.allocations.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         if allocated + amount > charge.amount: raise ValidationError("Allocation exceeds outstanding charge balance.")
         total += amount
