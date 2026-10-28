@@ -61,3 +61,19 @@ def test_receipt_allocation_rejects_currency_mismatch():
     with pytest.raises(ValidationError, match="currencies must match"):
         allocate_receipt(receipt.id, [{"charge_id": charge.id, "amount": "50.00"}])
     assert not receipt.allocations.exists()
+
+@pytest.mark.django_db
+def test_receipt_allocation_rejects_charge_currency_different_from_lease():
+    c = Company.objects.create(name="شركة")
+    tenant = Party.objects.create(company=c, display_name="مستأجر")
+    p = Property.objects.create(company=c, code="P-CUR2", name="عقار", kind="residential", ownership_type="company_owned")
+    u = Unit.objects.create(company=c, property=p, code="U-CUR2", kind="apartment")
+    lease = Lease.objects.create(company=c, lease_number="L-CUR2", unit=u, tenant=tenant,
+        start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), rent_amount=Decimal("100.00"), currency="EGP")
+    charge = LeaseCharge.objects.create(company=c, lease=lease, due_date=date(2026, 1, 1),
+        amount=Decimal("100.00"), currency="USD")
+    receipt = Receipt.objects.create(company=c, receipt_number="R-CUR2", tenant=tenant,
+        receipt_date=date(2026, 1, 5), amount=Decimal("100.00"), currency="USD", cash_account_code="1100")
+    with pytest.raises(ValidationError, match="Charge currency must match its lease currency"):
+        allocate_receipt(receipt.id, [{"charge_id": charge.id, "amount": "50.00"}])
+    assert not receipt.allocations.exists()
