@@ -17,6 +17,21 @@ def test_monthly_schedule_generated():
     assert generate_lease_schedule(lease.id) == 3
 
 @pytest.mark.django_db
+def test_schedule_does_not_create_charge_before_lease_start():
+    c = Company.objects.create(name="شركة")
+    tenant = Party.objects.create(company=c, display_name="مستأجر")
+    p = Property.objects.create(company=c, code="P-START", name="عقار", kind="residential", ownership_type="company_owned")
+    u = Unit.objects.create(company=c, property=p, code="U-START", kind="apartment")
+    lease = Lease.objects.create(company=c, lease_number="L-START", unit=u, tenant=tenant,
+        start_date=date(2026, 1, 20), end_date=date(2026, 3, 31),
+        rent_amount=Decimal("8000.00"), due_day=1, frequency="monthly")
+
+    assert generate_lease_schedule(lease.id) == 2
+    charges = list(lease.charges.order_by("due_date").values_list("due_date", flat=True))
+    assert charges == [date(2026, 2, 1), date(2026, 3, 1)]
+
+
+@pytest.mark.django_db
 def test_partial_receipt_allocation():
     c = Company.objects.create(name="شركة")
     tenant = Party.objects.create(company=c, display_name="مستأجر")
