@@ -51,6 +51,8 @@ def allocate_receipt(receipt_id, allocations):
         charge = LeaseCharge.objects.select_for_update().select_related("lease").get(pk=charge_id)
         if charge.company_id != receipt.company_id or charge.lease.tenant_id != receipt.tenant_id:
             raise ValidationError("Charge does not belong to this receipt tenant/company.")
+        if charge.currency.upper() != charge.lease.currency.upper():
+            raise ValidationError("Charge currency must match its lease currency.")
         if receipt.currency.upper() != charge.currency.upper():
             raise ValidationError("Receipt and charge currencies must match.")
         if charge.status == "void":
