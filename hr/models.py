@@ -684,3 +684,69 @@ class CustodyAssignment(models.Model):
         ordering = ["-issued_at"]
         verbose_name = "تسليم عهدة"
         verbose_name_plural = "حركة عهد الموظفين"
+
+
+class EmployeeContract(models.Model):
+    class ContractType(models.TextChoices):
+        PERMANENT = "permanent", "دائم"
+        FIXED_TERM = "fixed_term", "محدد المدة"
+        PROBATION = "probation", "تحت الاختبار"
+        PART_TIME = "part_time", "دوام جزئي"
+        TEMPORARY = "temporary", "مؤقت"
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        ACTIVE = "active", "ساري"
+        EXPIRED = "expired", "منتهي"
+        TERMINATED = "terminated", "منهى"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="contracts", verbose_name="الموظف")
+    contract_number = models.CharField("رقم العقد", max_length=60, unique=True)
+    contract_type = models.CharField("نوع العقد", max_length=20, choices=ContractType.choices)
+    start_date = models.DateField("تاريخ البداية")
+    end_date = models.DateField("تاريخ النهاية", null=True, blank=True)
+    probation_end_date = models.DateField("نهاية الاختبار", null=True, blank=True)
+    notice_days = models.PositiveSmallIntegerField("مدة الإخطار بالأيام", default=30)
+    agreed_basic_salary = models.DecimalField("الأساسي المتفق عليه", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    currency = models.CharField("العملة", max_length=3, default="EGP")
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    signed_document = models.FileField("نسخة العقد الموقعة", upload_to="hr/contracts/%Y/%m/", blank=True)
+    renewed_from = models.ForeignKey("self", on_delete=models.PROTECT, null=True, blank=True, related_name="renewals", verbose_name="العقد السابق")
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_hr_contracts", verbose_name="اعتمد بواسطة")
+    notes = models.TextField("ملاحظات", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-start_date"]
+        verbose_name = "عقد موظف"
+        verbose_name_plural = "عقود الموظفين"
+
+
+class EmployeeWarning(models.Model):
+    class Severity(models.TextChoices):
+        NOTICE = "notice", "تنبيه"
+        FIRST = "first", "إنذار أول"
+        FINAL = "final", "إنذار نهائي"
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        UNDER_REVIEW = "under_review", "قيد المراجعة"
+        ISSUED = "issued", "صادر"
+        ACKNOWLEDGED = "acknowledged", "تم الإقرار بالاستلام"
+        APPEALED = "appealed", "تم التظلم"
+        CANCELLED = "cancelled", "ملغى"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="warnings", verbose_name="الموظف")
+    warning_number = models.CharField("رقم الإنذار", max_length=60, unique=True)
+    incident_date = models.DateField("تاريخ الواقعة")
+    issued_date = models.DateField("تاريخ الإصدار", null=True, blank=True)
+    severity = models.CharField("درجة الإنذار", max_length=20, choices=Severity.choices)
+    reason = models.TextField("سبب الإنذار")
+    policy_reference = models.CharField("مرجع اللائحة", max_length=160, blank=True)
+    corrective_action = models.TextField("الإجراء التصحيحي المطلوب", blank=True)
+    response_deadline = models.DateField("موعد الرد", null=True, blank=True)
+    employee_response = models.TextField("رد الموظف", blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="issued_employee_warnings", verbose_name="صدر بواسطة")
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, null=True, blank=True, related_name="employee_warnings", verbose_name="طلب الاعتماد")
+    attachment = models.FileField("مرفق/محضر", upload_to="hr/warnings/%Y/%m/", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-incident_date"]
+        verbose_name = "إنذار موظف"
+        verbose_name_plural = "إنذارات الموظفين"
