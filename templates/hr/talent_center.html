@@ -75,14 +75,14 @@
 <section class="panel" style="margin-top:22px">
   <div class="panel-head"><div><h3>{% if english %}Development plans{% else %}خطط التطوير الوظيفي{% endif %}</h3></div></div>
   <div class="table-wrap"><table><thead><tr><th>{% if english %}Employee{% else %}الموظف{% endif %}</th><th>{% if english %}Plan{% else %}الخطة{% endif %}</th><th>{% if english %}Status{% else %}الحالة{% endif %}</th><th>{% if english %}Progress{% else %}الإنجاز{% endif %}</th><th>{% if english %}Target date{% else %}التاريخ المستهدف{% endif %}</th></tr></thead><tbody>
-  {% for row in development_plans %}<tr><td>{{ row.employee.full_name }}</td><td>{{ row.title }}</td><td>{{ row.get_status_display }}</td><td>{{ row.progress_percent }}%</td><td>{{ row.target_date|default:"—" }}</td></tr>{% empty %}<tr><td colspan="5">{% if english %}No plans recorded yet.{% else %}لا توجد خطط مسجلة بعد.{% endif %}</td></tr>{% endfor %}
+  {% for row in development_plans %}<tr><td>{{ row.employee.full_name }}</td><td>{{ row.title }}</td><td>{{ row.status_label }}</td><td>{{ row.progress_percent }}%</td><td>{{ row.target_date|default:"—" }}</td></tr>{% empty %}<tr><td colspan="5">{% if english %}No plans recorded yet.{% else %}لا توجد خطط مسجلة بعد.{% endif %}</td></tr>{% endfor %}
   </tbody></table></div>
 </section>
 
 <section class="panel" style="margin-top:22px">
   <div class="panel-head"><div><h3>{% if english %}Succession coverage{% else %}تغطية التعاقب الوظيفي{% endif %}</h3></div></div>
   <div class="table-wrap"><table><thead><tr><th>{% if english %}Position{% else %}الوظيفة{% endif %}</th><th>{% if english %}Nominee{% else %}المرشح{% endif %}</th><th>{% if english %}Readiness{% else %}الجاهزية{% endif %}</th><th>{% if english %}Development needs{% else %}احتياجات التطوير{% endif %}</th></tr></thead><tbody>
-  {% for row in succession_plans %}<tr><td>{{ row.position.title }}</td><td>{{ row.nominee.full_name }}</td><td>{{ row.get_readiness_display }}</td><td>{{ row.development_needs|default:"—" }}</td></tr>{% empty %}<tr><td colspan="4">{% if english %}No succession candidates recorded yet.{% else %}لا توجد خطط تعاقب مسجلة بعد.{% endif %}</td></tr>{% endfor %}
+  {% for row in succession_plans %}<tr><td>{{ row.position.title }}</td><td>{{ row.nominee.full_name }}</td><td>{{ row.readiness_label }}</td><td>{{ row.development_needs|default:"—" }}</td></tr>{% empty %}<tr><td colspan="4">{% if english %}No succession candidates recorded yet.{% else %}لا توجد خطط تعاقب مسجلة بعد.{% endif %}</td></tr>{% endfor %}
   </tbody></table></div>
 </section>
 {% endblock %}
