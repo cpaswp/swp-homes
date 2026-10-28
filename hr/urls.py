@@ -5,6 +5,7 @@ app_name = "hr"
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("employees/", views.employee_list, name="employees"),
+    path("recruitment/interviews/", views.recruitment_interviews, name="recruitment_interviews"),
     path("settings/attendance-devices/", views.attendance_device_settings, name="attendance_device_settings"),
     path("settings/compliance/", views.compliance_settings, name="compliance_settings"),
     path("data/excel/", views.excel_center, name="excel_center"),
