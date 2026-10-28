@@ -191,3 +191,25 @@ def management_reports(request):
         "open_warnings": open_warnings,
     }
     return render(request, "hr/management_reports.html", context)
+
+
+@login_required
+def employee_id_card(request, employee_id):
+    """Print-ready front/back employee ID card; company data comes from the user's active membership."""
+    employee = get_object_or_404(
+        Employee.objects.select_related("department", "position"),
+        pk=employee_id,
+    )
+    membership = request.user.company_memberships.select_related("company").first()
+    company = membership.company if membership else None
+    today = timezone.localdate()
+    contract = EmployeeContract.objects.filter(
+        employee=employee, status=EmployeeContract.Status.ACTIVE
+    ).order_by("-end_date").first()
+    valid_until = contract.end_date if contract and contract.end_date else None
+    return render(request, "hr/employee_id_card.html", {
+        "employee": employee,
+        "company": company,
+        "valid_until": valid_until,
+        "today": today,
+    })
