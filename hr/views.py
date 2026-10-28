@@ -213,3 +213,53 @@ def employee_id_card(request, employee_id):
         "valid_until": valid_until,
         "today": today,
     })
+
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from .models import AttendanceDeviceConfiguration
+
+ATTENDANCE_DEVICE_CATALOG = [
+    {"manufacturer":"ZKTeco","models":["K40","K50","K60","K70","F18","F19","F22","F28","iClock 680","iClock 880","MB10","MB20","MB2000","SpeedFace-V5L","ProFace X","uFace 800"]},
+    {"manufacturer":"Hikvision","models":["DS-K1T804","DS-K1T805","DS-K1T341","DS-K1T671","DS-K1T673","MinMoe series","DS-K1A802"]},
+    {"manufacturer":"Suprema","models":["BioStation 2","BioStation 3","BioEntry W2","FaceStation F2","BioLite N2","BioEntry P2"]},
+    {"manufacturer":"Anviz","models":["C2 Pro","C2 Slim","W1 Pro","FaceDeep 3","FaceDeep 5","VF30 Pro","EP300 Pro"]},
+    {"manufacturer":"HID","models":["Signo 20","Signo 40","iCLASS SE","VertX EVO"]},
+    {"manufacturer":"Nitgen","models":["HFDU06","eNBioAccess-T9","NAC-5000"]},
+    {"manufacturer":"Matrix COSEC","models":["PATH","ARC DC200P","DOOR FOP","VEGA FAXQ"]},
+    {"manufacturer":"Realtime","models":["T52","T53","T55","T60","T62"]},
+    {"manufacturer":"Dahua","models":["ASI6213J-MW","ASI7213X-T1","ASI8213Y-V3","ASA1222E"]},
+    {"manufacturer":"HFSecurity","models":["HF-A5","HF-FR1500","HF-FR1200"]},
+    {"manufacturer":"ESSL","models":["X990","K90 Pro","MB20","FaceX"]},
+    {"manufacturer":"Ronald Jack","models":["X628C","U160","F18","iClock 680","K40"]},
+    {"manufacturer":"Other / غير ذلك","models":["موديل آخر — إدخال يدوي"]},
+]
+
+@login_required
+@staff_member_required
+def attendance_device_settings(request):
+    if request.method == "POST":
+        device_id = request.POST.get("device_id", "").strip()
+        device = get_object_or_404(AttendanceDeviceConfiguration, pk=device_id) if device_id else AttendanceDeviceConfiguration()
+        device.name = request.POST.get("name", "").strip() or "ماكينة الحضور"
+        device.manufacturer = request.POST.get("manufacturer", "").strip()
+        device.model_name = request.POST.get("model_name", "").strip()
+        device.connection_type = request.POST.get("connection_type", "lan")
+        device.ip_address = request.POST.get("ip_address", "").strip() or None
+        port = request.POST.get("port", "").strip()
+        device.port = int(port) if port.isdigit() and 1 <= int(port) <= 65535 else None
+        device.site_name = request.POST.get("site_name", "").strip()
+        device.protocol_or_software = request.POST.get("protocol_or_software", "").strip()
+        device.external_device_id = request.POST.get("external_device_id", "").strip()
+        device.enabled = request.POST.get("enabled") == "on"
+        device.notes = request.POST.get("notes", "").strip()
+        if not device.manufacturer or not device.model_name:
+            messages.error(request, "يرجى تحديد الشركة المصنعة وموديل الجهاز.")
+        else:
+            device.save()
+            messages.success(request, "تم حفظ الإعدادات. يلزم تنفيذ واختبار موصل متوافق قبل المزامنة الفعلية.")
+            return redirect("hr:attendance_device_settings")
+    return render(request, "hr/attendance_device_settings.html", {
+        "devices": AttendanceDeviceConfiguration.objects.all(),
+        "connection_choices": AttendanceDeviceConfiguration.ConnectionType.choices,
+        "catalog": ATTENDANCE_DEVICE_CATALOG,
+    })
