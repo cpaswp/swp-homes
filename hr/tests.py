@@ -2,7 +2,7 @@ from datetime import date
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from .models import Department, JobPosition, Employee
+from .models import Department, JobPosition, Employee, PayrollPeriod, PayrollItem, DepartmentWorkforcePlan
 
 
 class HRScreenTests(TestCase):
@@ -33,3 +33,26 @@ class HRScreenTests(TestCase):
         response = self.client.get(reverse("hr:org_chart"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "الخريطة التنظيمية")
+
+
+    def test_integrated_management_report_renders(self):
+        self.client.force_login(self.user)
+        period = PayrollPeriod.objects.create(
+            name="أكتوبر 2026", start_date=date(2026, 10, 1), end_date=date(2026, 10, 31)
+        )
+        PayrollItem.objects.create(
+            period=period, employee=self.employee, basic_salary="10000.00",
+            allowances="1000.00", overtime="0.00", deductions="250.00",
+            tax_and_insurance="1200.00", net_salary="9550.00"
+        )
+        DepartmentWorkforcePlan.objects.create(
+            department=self.department, fiscal_year=2026, approved_headcount=2,
+            minimum_headcount=1, maximum_headcount=3,
+            approved_monthly_payroll_budget="25000.00",
+            approved_annual_payroll_budget="300000.00"
+        )
+        response = self.client.get(reverse("hr:management_reports"), {"period": period.pk, "year": 2026})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "تكلفة المرتبات حسب الإدارة")
+        self.assertContains(response, "العمليات")
+        self.assertContains(response, "25000.00")
