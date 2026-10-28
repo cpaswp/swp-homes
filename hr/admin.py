@@ -8,7 +8,7 @@ from .models import (
     EmployeeAuditEvent, EmployeeRequirement, PositionAssignment, DepartmentWorkforcePlan,
     AdvancePolicy, EmployeeAdvance, CustodyAsset, CustodyAssignment, EmployeeContract, EmployeeWarning,
     EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
-    AttendanceDeviceConfiguration, OfferLetter, EmployeeDependent, EmployeeMedicalBenefit, EmployeeHousingAssignment,
+    AttendanceDeviceConfiguration, RegulationRule, HiringDocumentTemplate, OfferLetter, EmployeeDependent, EmployeeMedicalBenefit, EmployeeHousingAssignment,
     EmployeeChildcareBenefit, EmployeeBenefitEnrollment,
 )
 
