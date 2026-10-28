@@ -4,7 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from core.models import Company, CompanyMembership, Party, Property, Unit
-from leasing.models import Lease, LeaseCharge
+from leasing.models import Lease, LeaseCharge, Receipt, ReceiptAllocation
 
 
 @pytest.mark.django_db
@@ -93,3 +93,30 @@ def test_unit_form_rejects_property_from_other_company(client):
     })
     assert response.status_code == 200
     assert not Unit.objects.filter(company=own).exists()
+
+
+@pytest.mark.django_db
+def test_dashboard_outstanding_does_not_duplicate_charges_with_multiple_allocations(client):
+    user = get_user_model().objects.create_user(username="dashboard-balance", password="strong-test-password")
+    company = Company.objects.create(name="Balance company")
+    CompanyMembership.objects.create(company=company, user=user, role="viewer")
+    tenant = Party.objects.create(company=company, display_name="Balance tenant")
+    prop = Property.objects.create(company=company, code="BAL-1", name="Balance property",
+        kind="residential", ownership_type="company_owned")
+    unit = Unit.objects.create(company=company, property=prop, code="BAL-U1", kind="apartment")
+    lease = Lease.objects.create(company=company, lease_number="BAL-L1", unit=unit, tenant=tenant,
+        start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), rent_amount=Decimal("1000.00"))
+    charge = LeaseCharge.objects.create(company=company, lease=lease, due_date=date(2026, 1, 1),
+        amount=Decimal("1000.00"))
+    first = Receipt.objects.create(company=company, receipt_number="BAL-R1", tenant=tenant,
+        receipt_date=date(2026, 1, 5), amount=Decimal("200.00"), cash_account_code="1100")
+    second = Receipt.objects.create(company=company, receipt_number="BAL-R2", tenant=tenant,
+        receipt_date=date(2026, 1, 6), amount=Decimal("300.00"), cash_account_code="1100")
+    ReceiptAllocation.objects.create(receipt=first, charge=charge, amount=Decimal("200.00"))
+    ReceiptAllocation.objects.create(receipt=second, charge=charge, amount=Decimal("300.00"))
+
+    client.force_login(user)
+    response = client.get(reverse("dashboard"))
+
+    assert response.status_code == 200
+    assert response.context["outstanding"] == Decimal("500.00")
