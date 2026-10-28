@@ -746,7 +746,7 @@ def talent_center(request):
 @login_required
 def employee_excellence_dashboard(request):
     """Transparent, configurable ranking from approved HR performance reviews only."""
-    if not request.user.is_staff and not request.user.is_superuser:
+    if not request.user.is_superuser and not request.user.has_perm("hr.view_performancereview"):
         return HttpResponseForbidden("Access denied")
     english = request.LANGUAGE_CODE == "en"
     settings_obj = EmployeeOfTheMonthSettings.objects.first() or EmployeeOfTheMonthSettings()
@@ -819,7 +819,8 @@ def employee_excellence_dashboard(request):
 @login_required
 def employee_fund_center(request):
     """HR-only fund operations; payout decisions remain explicitly human-approved."""
-    if not request.user.is_staff and not request.user.is_superuser:
+    fund_view_permissions = ("hr.view_employeefundpolicy", "hr.view_employeefundmembership", "hr.view_employeefundcontribution", "hr.view_employeeassociationturn", "hr.view_employeeemergencyclaim")
+    if not request.user.is_superuser and not request.user.has_perms(fund_view_permissions):
         return HttpResponseForbidden("Access denied")
     english = request.LANGUAGE_CODE == "en"
     active_policy = EmployeeFundPolicy.objects.filter(active=True).order_by("-effective_from").first()
@@ -829,6 +830,8 @@ def employee_fund_center(request):
         try:
             with transaction.atomic():
                 if action == "policy":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_employeefundpolicy"):
+                        return HttpResponseForbidden("Access denied")
                     emergency = Decimal(request.POST.get("emergency_share_percent", "10"))
                     association = Decimal(request.POST.get("association_share_percent", "90"))
                     amount = Decimal(request.POST.get("monthly_deduction_amount", "0"))
@@ -846,6 +849,8 @@ def employee_fund_center(request):
                         notes=request.POST.get("notes", "").strip(),
                     )
                 elif action == "membership":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_employeefundmembership"):
+                        return HttpResponseForbidden("Access denied")
                     policy = get_object_or_404(EmployeeFundPolicy, pk=request.POST.get("policy"))
                     employee = get_object_or_404(Employee, pk=request.POST.get("employee"), status=Employee.Status.ACTIVE)
                     amount = Decimal(request.POST.get("monthly_amount", "0"))
@@ -857,6 +862,8 @@ def employee_fund_center(request):
                         joined_on=joined, consent_reference=request.POST["consent_reference"].strip(),
                     )
                 elif action == "generate":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_employeefundcontribution"):
+                        return HttpResponseForbidden("Access denied")
                     period = get_object_or_404(PayrollPeriod, pk=request.POST.get("period"))
                     if period.status in ("approved", "paid"):
                         raise ValueError("لا يمكن تعديل مسير معتمد أو مصروف")
@@ -884,6 +891,8 @@ def employee_fund_center(request):
                     messages.success(request, (f"Created {made} contributions." if english else f"تم إنشاء {made} استقطاعًا وربطها بمسير المرتبات."))
                     return redirect("hr:employee_fund_center")
                 elif action == "claim":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_employeeemergencyclaim"):
+                        return HttpResponseForbidden("Access denied")
                     employee = get_object_or_404(Employee, pk=request.POST.get("employee"))
                     requested = Decimal(request.POST.get("requested_amount", "0"))
                     event_date = date.fromisoformat(request.POST.get("event_date", ""))
@@ -895,6 +904,8 @@ def employee_fund_center(request):
                         event_date=event_date, description=description, requested_amount=requested,
                     )
                 elif action == "turn":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_employeeassociationturn"):
+                        return HttpResponseForbidden("Access denied")
                     membership = get_object_or_404(EmployeeFundMembership, pk=request.POST.get("membership"))
                     cycle = request.POST.get("cycle_name", "").strip()
                     turn_number = int(request.POST.get("turn_number", "0"))
@@ -907,6 +918,8 @@ def employee_fund_center(request):
                         expected_amount=expected,
                     )
                 elif action == "claim_pay":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.change_employeeemergencyclaim"):
+                        return HttpResponseForbidden("Access denied")
                     claim = get_object_or_404(EmployeeEmergencyClaim.objects.select_for_update(), pk=request.POST.get("claim"))
                     if claim.status != EmployeeEmergencyClaim.Status.APPROVED or not claim.approved_amount:
                         raise ValueError("يجب اعتماد الطلب وتحديد مبلغ الصرف أولًا")
@@ -918,6 +931,8 @@ def employee_fund_center(request):
                     claim.paid_at = date.today()
                     claim.save(update_fields=["status", "paid_at"])
                 elif action == "turn_decision":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.change_employeeassociationturn"):
+                        return HttpResponseForbidden("Access denied")
                     turn = get_object_or_404(EmployeeAssociationTurn.objects.select_for_update(), pk=request.POST.get("turn"))
                     decision = request.POST.get("decision")
                     if decision == "approved":
@@ -942,6 +957,8 @@ def employee_fund_center(request):
                         raise ValueError("قرار غير صحيح")
                     turn.save()
                 elif action == "claim_decision":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.change_employeeemergencyclaim"):
+                        return HttpResponseForbidden("Access denied")
                     claim = get_object_or_404(EmployeeEmergencyClaim.objects.select_for_update(), pk=request.POST.get("claim"))
                     decision = request.POST.get("decision")
                     if decision not in ("approved", "rejected"):
