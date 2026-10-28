@@ -1,13 +1,13 @@
 import json
 from decimal import Decimal
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Sum, Avg, Count, F\nfrom django.db import transaction\nfrom django.contrib import messages\nfrom datetime import date
 from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from .models import (Employee, Department, AttendanceRecord, LeaveRequest, ApprovalRequest, PayrollPeriod, PayrollItem,
                      DepartmentWorkforcePlan, EmployeeRequirement, EmployeeDocument, EmployeeAdvance, CustodyAsset, CustodyAssignment, PositionAssignment, EmployeeContract, EmployeeWarning, EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
-                     Skill, EmployeeSkill, CareerDevelopmentPlan, SuccessionPlan, JobPosition)
+                     Skill, EmployeeSkill, CareerDevelopmentPlan, SuccessionPlan, JobPosition, PerformanceReview, EmployeeOfTheMonthSettings, EmployeeFundPolicy, EmployeeFundMembership, EmployeeFundContribution, EmployeeAssociationTurn, EmployeeEmergencyClaim)
 
 
 @login_required
@@ -739,4 +739,205 @@ def talent_center(request):
         "active_development_count": CareerDevelopmentPlan.objects.filter(status=CareerDevelopmentPlan.Status.ACTIVE).count(),
         "critical_positions_covered": SuccessionPlan.objects.filter(is_active=True).values("position_id").distinct().count(),
         "english": english,
+    })
+
+
+
+@login_required
+def employee_excellence_dashboard(request):
+    """Transparent, configurable ranking from approved HR performance reviews only."""
+    if not request.user.is_staff and not request.user.is_superuser:
+        return HttpResponseForbidden("Access denied")
+    english = request.LANGUAGE_CODE == "en"
+    settings_obj = EmployeeOfTheMonthSettings.objects.first() or EmployeeOfTheMonthSettings()
+    weights = {
+        "performance": settings_obj.performance_weight,
+        "appearance": settings_obj.appearance_weight,
+        "behavior": settings_obj.behavior_weight,
+        "commitment": settings_obj.commitment_weight,
+    }
+    weight_total = sum(weights.values(), Decimal("0"))
+    valid_weights = weight_total == Decimal("100.00")
+    approved_statuses = ("approved", "completed", "final", "published")
+    reviews = PerformanceReview.objects.filter(status__in=approved_statuses, employee__status=Employee.Status.ACTIVE).select_related("employee", "employee__department")
+    period_start = request.GET.get("start", "").strip()
+    period_end = request.GET.get("end", "").strip()
+    if period_start:
+        try:
+            reviews = reviews.filter(period_end__gte=date.fromisoformat(period_start))
+        except ValueError:
+            period_start = ""
+    if period_end:
+        try:
+            reviews = reviews.filter(period_end__lte=date.fromisoformat(period_end))
+        except ValueError:
+            period_end = ""
+    score_map = {}
+    if valid_weights:
+        for review in reviews:
+            components = {
+                "performance": review.performance_score,
+                "appearance": review.appearance_score,
+                "behavior": review.behavior_score,
+                "commitment": review.commitment_score,
+            }
+            # Scores are expected on a 0–100 scale. Clamp out-of-range legacy values to prevent inflated ranks.
+            normalized = {key: max(Decimal("0"), min(Decimal("100"), Decimal(value))) for key, value in components.items()}
+            score = sum((normalized[key] * weights[key] / Decimal("100") for key in weights), Decimal("0"))
+            row = score_map.setdefault(review.employee_id, {
+                "employee": review.employee, "scores": [], "count": 0,
+                "performance": [], "appearance": [], "behavior": [], "commitment": [],
+            })
+            row["scores"].append(score)
+            row["count"] += 1
+            for key, value in normalized.items():
+                row[key].append(value)
+        for row in score_map.values():
+            row["overall"] = sum(row["scores"], Decimal("0")) / Decimal(len(row["scores"]))
+            for key in ("performance", "appearance", "behavior", "commitment"):
+                row[key + "_avg"] = sum(row[key], Decimal("0")) / Decimal(len(row[key]))
+        eligible = [row for row in score_map.values() if row["count"] >= settings_obj.minimum_reviews and row["overall"] >= settings_obj.minimum_score]
+        company_ranking = sorted(eligible, key=lambda row: (-row["overall"], -row["commitment_avg"], row["employee"].employee_code))
+        department_rankings = {}
+        for row in eligible:
+            dept = row["employee"].department
+            key = dept.pk if dept else 0
+            department_rankings.setdefault(key, {"department": dept, "rows": []})["rows"].append(row)
+        for group in department_rankings.values():
+            group["rows"].sort(key=lambda row: (-row["overall"], -row["commitment_avg"], row["employee"].employee_code))
+    else:
+        company_ranking, department_rankings = [], {}
+    return render(request, "hr/employee_excellence.html", {
+        "english": english, "weights": weights, "weight_total": weight_total,
+        "valid_weights": valid_weights, "company_ranking": company_ranking,
+        "department_rankings": department_rankings, "review_count": reviews.count(),
+        "period_start": period_start, "period_end": period_end,
+        "minimum_reviews": settings_obj.minimum_reviews, "minimum_score": settings_obj.minimum_score,
+    })
+
+
+@login_required
+def employee_fund_center(request):
+    """HR-only fund operations; payout decisions remain explicitly human-approved."""
+    if not request.user.is_staff and not request.user.is_superuser:
+        return HttpResponseForbidden("Access denied")
+    english = request.LANGUAGE_CODE == "en"
+    active_policy = EmployeeFundPolicy.objects.filter(active=True).order_by("-effective_from").first()
+    employees = Employee.objects.filter(status=Employee.Status.ACTIVE).select_related("department").order_by("full_name")
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        try:
+            with transaction.atomic():
+                if action == "policy":
+                    emergency = Decimal(request.POST.get("emergency_share_percent", "10"))
+                    association = Decimal(request.POST.get("association_share_percent", "90"))
+                    amount = Decimal(request.POST.get("monthly_deduction_amount", "0"))
+                    if amount < 0 or emergency < 0 or association < 0 or emergency > 100 or association > 100 or emergency + association != Decimal("100"):
+                        raise ValueError("النسب يجب أن تساوي 100% والمبالغ غير سالبة")
+                    effective = date.fromisoformat(request.POST.get("effective_from", ""))
+                    EmployeeFundPolicy.objects.filter(active=True).update(active=False, effective_to=effective)
+                    active_policy = EmployeeFundPolicy.objects.create(
+                        name=request.POST.get("name", "").strip() or ("Employee Friendship Fund" if english else "صندوق الزمالة والجمعية"),
+                        monthly_deduction_amount=amount,
+                        emergency_share_percent=emergency,
+                        association_share_percent=association,
+                        effective_from=effective,
+                        requires_approval=request.POST.get("requires_approval") == "on",
+                        notes=request.POST.get("notes", "").strip(),
+                    )
+                elif action == "membership":
+                    policy = get_object_or_404(EmployeeFundPolicy, pk=request.POST.get("policy"))
+                    employee = get_object_or_404(Employee, pk=request.POST.get("employee"), status=Employee.Status.ACTIVE)
+                    amount = Decimal(request.POST.get("monthly_amount", "0"))
+                    joined = date.fromisoformat(request.POST.get("joined_on", ""))
+                    if amount <= 0 or not request.POST.get("consent_reference", "").strip():
+                        raise ValueError("اشتراك الموظف يتطلب مبلغًا وموافقة موثقة")
+                    EmployeeFundMembership.objects.create(
+                        employee=employee, policy=policy, monthly_amount=amount,
+                        joined_on=joined, consent_reference=request.POST["consent_reference"].strip(),
+                    )
+                elif action == "generate":
+                    period = get_object_or_404(PayrollPeriod, pk=request.POST.get("period"))
+                    if period.status in ("approved", "paid"):
+                        raise ValueError("لا يمكن تعديل مسير معتمد أو مصروف")
+                    policy = get_object_or_404(EmployeeFundPolicy, pk=request.POST.get("policy"), active=True)
+                    memberships = EmployeeFundMembership.objects.select_for_update().filter(policy=policy, status=EmployeeFundMembership.Status.ACTIVE, joined_on__lte=period.end_date).select_related("employee")
+                    made = 0
+                    for membership in memberships:
+                        payroll_item = PayrollItem.objects.filter(period=period, employee=membership.employee).first()
+                        if not payroll_item:
+                            continue
+                        gross = membership.monthly_amount
+                        emergency = (gross * policy.emergency_share_percent / Decimal("100")).quantize(Decimal("0.01"))
+                        association = gross - emergency
+                        contribution, created = EmployeeFundContribution.objects.get_or_create(
+                            membership=membership, period=period,
+                            defaults={"gross_amount": gross, "emergency_amount": emergency, "association_amount": association, "payroll_item": payroll_item},
+                        )
+                        if created:
+                            payroll_item.deductions += gross
+                            payroll_item.net_salary = payroll_item.basic_salary + payroll_item.allowances + payroll_item.overtime - payroll_item.deductions - payroll_item.tax_and_insurance
+                            payroll_item.save(update_fields=["deductions", "net_salary"])
+                            contribution.status = EmployeeFundContribution.Status.DEDUCTED
+                            contribution.save(update_fields=["status"])
+                            made += 1
+                    messages.success(request, (f"Created {made} contributions." if english else f"تم إنشاء {made} استقطاعًا وربطها بمسير المرتبات."))
+                    return redirect("hr:employee_fund_center")
+                elif action == "claim":
+                    employee = get_object_or_404(Employee, pk=request.POST.get("employee"))
+                    requested = Decimal(request.POST.get("requested_amount", "0"))
+                    event_date = date.fromisoformat(request.POST.get("event_date", ""))
+                    description = request.POST.get("description", "").strip()
+                    if requested <= 0 or not description:
+                        raise ValueError("تفاصيل الحدث والمبلغ مطلوبة")
+                    EmployeeEmergencyClaim.objects.create(
+                        employee=employee, event_type=request.POST.get("event_type"),
+                        event_date=event_date, description=description, requested_amount=requested,
+                    )
+                elif action == "turn":
+                    membership = get_object_or_404(EmployeeFundMembership, pk=request.POST.get("membership"))
+                    cycle = request.POST.get("cycle_name", "").strip()
+                    turn_number = int(request.POST.get("turn_number", "0"))
+                    expected = Decimal(request.POST.get("expected_amount", "0"))
+                    if not cycle or turn_number < 1 or expected < 0:
+                        raise ValueError("بيانات الدور غير صحيحة")
+                    EmployeeAssociationTurn.objects.create(
+                        membership=membership, cycle_name=cycle, turn_number=turn_number,
+                        scheduled_date=date.fromisoformat(request.POST["scheduled_date"]) if request.POST.get("scheduled_date") else None,
+                        expected_amount=expected,
+                    )
+                elif action == "claim_decision":
+                    claim = get_object_or_404(EmployeeEmergencyClaim.objects.select_for_update(), pk=request.POST.get("claim"))
+                    decision = request.POST.get("decision")
+                    if decision not in ("approved", "rejected"):
+                        raise ValueError("قرار غير صحيح")
+                    if claim.status not in ("submitted", "under_review"):
+                        raise ValueError("تمت معالجة الطلب مسبقًا")
+                    claim.status = decision
+                    claim.reviewer = request.user
+                    claim.reviewed_at = timezone.now()
+                    claim.approved_amount = Decimal(request.POST.get("approved_amount", "0")) if decision == "approved" else None
+                    if decision == "approved" and (claim.approved_amount is None or claim.approved_amount <= 0):
+                        raise ValueError("المبلغ المعتمد يجب أن يكون أكبر من صفر")
+                    claim.decision_notes = request.POST.get("decision_notes", "").strip()
+                    claim.save()
+                else:
+                    raise ValueError("إجراء غير معروف")
+            messages.success(request, "Saved successfully." if english else "تم الحفظ بنجاح.")
+        except Exception as exc:
+            # Show a safe validation message; transaction.atomic rolls back any partial payroll changes.
+            messages.error(request, str(exc) if english else "تعذر الحفظ. راجع البيانات وتأكد من عدم تكرار الاشتراك أو الدور.")
+        return redirect("hr:employee_fund_center")
+    policies = EmployeeFundPolicy.objects.all()
+    memberships = EmployeeFundMembership.objects.select_related("employee", "policy").all()[:200]
+    contributions = EmployeeFundContribution.objects.select_related("membership__employee", "period").all()[:200]
+    turns = EmployeeAssociationTurn.objects.select_related("membership__employee").all()[:200]
+    claims = EmployeeEmergencyClaim.objects.select_related("employee", "reviewer").all()[:200]
+    periods = PayrollPeriod.objects.exclude(status__in=("approved", "paid")).order_by("-start_date")
+    return render(request, "hr/employee_fund_center.html", {
+        "english": english, "policy": active_policy, "policies": policies,
+        "employees": employees, "memberships": memberships, "contributions": contributions,
+        "turns": turns, "claims": claims, "periods": periods,
+        "total_emergency": EmployeeFundContribution.objects.exclude(status="reversed").aggregate(total=Sum("emergency_amount"))["total"] or Decimal("0"),
+        "total_association": EmployeeFundContribution.objects.exclude(status="reversed").aggregate(total=Sum("association_amount"))["total"] or Decimal("0"),
     })
