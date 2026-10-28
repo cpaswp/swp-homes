@@ -112,3 +112,72 @@ class TalentCenterTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(CareerDevelopmentPlan.objects.count(), 0)
 
+class EmployeeExcellenceAndFundTests(TestCase):
+    def setUp(self):
+        self.admin = get_user_model().objects.create_superuser(
+            username="fund-admin", email="fund-admin@example.test", password="a-strong-test-password"
+        )
+        self.department = Department.objects.create(code="FND", name="إدارة الصندوق")
+        self.position = JobPosition.objects.create(code="FND-01", title="موظف", department=self.department)
+        self.employee = Employee.objects.create(
+            employee_code="FND-EMP-01", full_name="موظف الصندوق",
+            department=self.department, position=self.position, date_of_birth=date(1990, 1, 1),
+            base_salary="1000.00",
+        )
+
+    def test_employee_excellence_dashboard_uses_approved_weighted_reviews(self):
+        from .models import PerformanceReview
+        PerformanceReview.objects.create(
+            employee=self.employee, reviewer=self.employee,
+            period_start=date(2026, 1, 1), period_end=date(2026, 9, 30),
+            performance_score="80", appearance_score="60", behavior_score="90",
+            commitment_score="100", overall_score="0", status="approved",
+        )
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("hr:employee_excellence_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["company_ranking"]), 1)
+        self.assertEqual(response.context["company_ranking"][0]["overall"], Decimal("84.00"))
+
+    def test_fund_policy_requires_percentages_total_100(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("hr:employee_fund_center"), {
+            "action": "policy", "name": "صندوق اختبار", "monthly_deduction_amount": "100",
+            "emergency_share_percent": "15", "association_share_percent": "90",
+            "effective_from": "2026-11-01",
+        })
+        self.assertEqual(response.status_code, 302)
+        from .models import EmployeeFundPolicy
+        self.assertEqual(EmployeeFundPolicy.objects.count(), 0)
+
+    def test_fund_deduction_splits_10_90_and_is_idempotent(self):
+        from .models import EmployeeFundPolicy, EmployeeFundMembership, EmployeeFundContribution
+        policy = EmployeeFundPolicy.objects.create(
+            name="صندوق الاختبار", monthly_deduction_amount="100.00",
+            emergency_share_percent="10.00", association_share_percent="90.00",
+            effective_from=date(2026, 1, 1), active=True,
+        )
+        membership = EmployeeFundMembership.objects.create(
+            employee=self.employee, policy=policy, monthly_amount="100.00",
+            joined_on=date(2026, 1, 1), consent_reference="CONSENT-TEST-1",
+        )
+        period = PayrollPeriod.objects.create(
+            name="نوفمبر 2026", start_date=date(2026, 11, 1), end_date=date(2026, 11, 30), status="draft"
+        )
+        item = PayrollItem.objects.create(
+            period=period, employee=self.employee, basic_salary="1000.00",
+            allowances="0.00", overtime="0.00", deductions="0.00",
+            tax_and_insurance="100.00", net_salary="900.00",
+        )
+        self.client.force_login(self.admin)
+        payload = {"action": "generate", "period": period.pk, "policy": policy.pk}
+        self.client.post(reverse("hr:employee_fund_center"), payload)
+        self.client.post(reverse("hr:employee_fund_center"), payload)
+        contribution = EmployeeFundContribution.objects.get(membership=membership, period=period)
+        item.refresh_from_db()
+        self.assertEqual(contribution.emergency_amount, Decimal("10.00"))
+        self.assertEqual(contribution.association_amount, Decimal("90.00"))
+        self.assertEqual(item.deductions, Decimal("100.00"))
+        self.assertEqual(item.net_salary, Decimal("800.00"))
+        self.assertEqual(EmployeeFundContribution.objects.filter(membership=membership, period=period).count(), 1)
+
