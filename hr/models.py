@@ -1184,3 +1184,102 @@ class InterviewEvaluation(models.Model):
             raise ValidationError({"score": "الدرجة الممنوحة لا يجوز أن تتجاوز الدرجة القصوى للسؤال."})
     def __str__(self):
         return f"{self.criterion} — {self.score}"
+
+
+class Skill(models.Model):
+    """Reusable competency catalogue for workforce planning."""
+    name = models.CharField("المهارة", max_length=160, unique=True)
+    category = models.CharField("التصنيف", max_length=80, blank=True)
+    description = models.TextField("الوصف", blank=True)
+    is_active = models.BooleanField("نشطة", default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["category", "name"]
+        verbose_name = "مهارة"
+        verbose_name_plural = "مصفوفة المهارات"
+
+    def __str__(self):
+        return self.name
+
+
+class EmployeeSkill(models.Model):
+    class Level(models.IntegerChoices):
+        BEGINNER = 1, "مبتدئ"
+        BASIC = 2, "أساسي"
+        INTERMEDIATE = 3, "متوسط"
+        ADVANCED = 4, "متقدم"
+        EXPERT = 5, "خبير"
+
+    employee = models.ForeignKey(Employee, verbose_name="الموظف", on_delete=models.CASCADE, related_name="skill_assessments")
+    skill = models.ForeignKey(Skill, verbose_name="المهارة", on_delete=models.PROTECT, related_name="employee_assessments")
+    level = models.PositiveSmallIntegerField("مستوى الإتقان", choices=Level.choices, validators=[MinValueValidator(1), MaxValueValidator(5)])
+    assessed_at = models.DateField("تاريخ التقييم", auto_now=True)
+    assessed_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="مقيّم المهارة", null=True, blank=True, on_delete=models.SET_NULL, related_name="hr_skill_assessments")
+    evidence = models.TextField("الأدلة والملاحظات", blank=True)
+    next_review_date = models.DateField("موعد المراجعة التالية", null=True, blank=True)
+
+    class Meta:
+        ordering = ["employee__employee_code", "skill__name"]
+        constraints = [models.UniqueConstraint(fields=["employee", "skill"], name="hr_unique_employee_skill")]
+        verbose_name = "تقييم مهارة موظف"
+        verbose_name_plural = "تقييمات مهارات الموظفين"
+
+    def __str__(self):
+        return f"{self.employee} — {self.skill} ({self.level}/5)"
+
+
+class CareerDevelopmentPlan(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        ACTIVE = "active", "قيد التنفيذ"
+        COMPLETED = "completed", "مكتملة"
+        CANCELLED = "cancelled", "ملغاة"
+
+    employee = models.ForeignKey(Employee, verbose_name="الموظف", on_delete=models.CASCADE, related_name="development_plans")
+    title = models.CharField("عنوان الخطة", max_length=180)
+    objective = models.TextField("الهدف التطويري")
+    actions = models.TextField("أنشطة وخطوات التطوير", blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    start_date = models.DateField("تاريخ البداية", null=True, blank=True)
+    target_date = models.DateField("التاريخ المستهدف", null=True, blank=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="المسؤول عن المتابعة", null=True, blank=True, on_delete=models.SET_NULL, related_name="owned_development_plans")
+    progress_percent = models.PositiveSmallIntegerField("نسبة الإنجاز", default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
+    review_notes = models.TextField("ملاحظات المراجعة", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["target_date", "employee__employee_code"]
+        verbose_name = "خطة تطوير وظيفي"
+        verbose_name_plural = "خطط التطوير الوظيفي"
+
+    def __str__(self):
+        return f"{self.employee} — {self.title}"
+
+
+class SuccessionPlan(models.Model):
+    class Readiness(models.TextChoices):
+        READY = "ready", "جاهز"
+        ONE_YEAR = "one_year", "جاهزية خلال سنة"
+        TWO_YEARS = "two_years", "جاهزية خلال سنتين"
+        DEVELOPMENT = "development", "يحتاج إلى تطوير"
+
+    position = models.ForeignKey(JobPosition, verbose_name="الوظيفة الحرجة", on_delete=models.PROTECT, related_name="succession_candidates")
+    nominee = models.ForeignKey(Employee, verbose_name="المرشح البديل", on_delete=models.CASCADE, related_name="succession_nominations")
+    readiness = models.CharField("درجة الجاهزية", max_length=20, choices=Readiness.choices, default=Readiness.DEVELOPMENT)
+    development_needs = models.TextField("احتياجات التطوير", blank=True)
+    risk_notes = models.TextField("ملاحظات المخاطر", blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="المراجع", null=True, blank=True, on_delete=models.SET_NULL, related_name="reviewed_succession_plans")
+    reviewed_at = models.DateField("تاريخ المراجعة", null=True, blank=True)
+    is_active = models.BooleanField("خطة نشطة", default=True)
+
+    class Meta:
+        ordering = ["position__title", "readiness", "nominee__full_name"]
+        constraints = [models.UniqueConstraint(fields=["position", "nominee"], name="hr_unique_position_successor")]
+        verbose_name = "خطة تعاقب وظيفي"
+        verbose_name_plural = "خطط التعاقب الوظيفي"
+
+    def __str__(self):
+        return f"{self.position} ← {self.nominee}"
+
