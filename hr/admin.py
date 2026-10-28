@@ -11,7 +11,7 @@ from .models import (
     AttendanceDeviceConfiguration, RegulationRule, HiringDocumentTemplate, OfferLetter, EmployeeDependent,
     EmployeeMedicalBenefit, EmployeeHousingAssignment, EmployeeChildcareBenefit, EmployeeBenefitEnrollment,
     RecruitmentInterview, InterviewCriterion, InterviewEvaluation,
-    Skill, EmployeeSkill, CareerDevelopmentPlan, SuccessionPlan,
+    Skill, EmployeeSkill, CareerDevelopmentPlan, SuccessionPlan, EmployeeOfTheMonthSettings, EmployeeFundPolicy, EmployeeFundMembership, EmployeeFundContribution, EmployeeAssociationTurn, EmployeeEmergencyClaim,
 )
 
 
@@ -82,4 +82,9 @@ admin.site.register([
     EmployeeChildcareBenefit, EmployeeBenefitEnrollment, AttendanceDeviceConfiguration, RegulationRule,
     HiringDocumentTemplate, RecordAttachment, RecruitmentInterview, InterviewCriterion, InterviewEvaluation,
     Skill,
+])
+
+admin.site.register([
+    EmployeeOfTheMonthSettings, EmployeeFundPolicy, EmployeeFundMembership,
+    EmployeeFundContribution, EmployeeAssociationTurn, EmployeeEmergencyClaim,
 ])
