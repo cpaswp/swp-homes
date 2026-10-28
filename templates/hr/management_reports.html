@@ -37,5 +37,19 @@
   <article class="stat"><span>التسكينات/التكليفات السارية</span><strong>{{ current_assignments_count }}</strong><small>سجلات سارية بالتاريخ الحالي</small></article>
   <article class="stat"><span>شواغر وفق خطط الإدارات</span><strong>{{ planned_vacancies }}</strong><small>مجموع الفرق الإيجابية بين الخطة والعدد الفعلي</small></article>
 </section>
+<section class="stats" style="margin-top:22px">
+  <article class="stat"><span>عقود تنتهي خلال 60 يومًا</span><strong>{{ contracts_expiring }}</strong><small>تحتاج قرار تجديد أو إنهاء</small></article>
+  <article class="stat"><span>عقود انتهت وتحتاج مراجعة</span><strong>{{ contracts_expired }}</strong><small>الحالة ما زالت سارية بالنظام</small></article>
+  <article class="stat"><span>إنذارات مفتوحة</span><strong>{{ open_warnings }}</strong><small>قيد المراجعة أو صادرة</small></article>
+</section>
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>مؤشرات المستهدفات — الكمية والقيمة والموازنة</h3><p>لا يُحتسب الإنجاز إلا من سجلات إنجاز تم التحقق منها؛ يُعرض الإنجاز الكمي والقيمي منفصلين عن استهلاك التكلفة.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>الإدارة</th><th>المستهدف</th><th>المسؤول</th><th>كمية مستهدفة</th><th>كمية منجزة</th><th>إنجاز الكمية</th><th>قيمة مستهدفة</th><th>قيمة منجزة</th><th>إنجاز القيمة</th><th>الموازنة</th><th>التكلفة الفعلية</th><th>استهلاك الموازنة</th></tr></thead><tbody>
+  {% for target in target_rows %}
+  <tr><td>{{ target.department.name }}</td><td><b>{{ target.name }}</b><small class="subline">{{ target.code }} · {{ target.get_status_display }}</small></td><td>{{ target.owner.full_name|default:"—" }}</td><td>{{ target.target_quantity|floatformat:3 }} {{ target.unit }}</td><td>{{ target.actual_quantity|floatformat:3 }}</td><td><div class="progress-track"><span style="width:{% if target.quantity_pct > 100 %}100{% else %}{{ target.quantity_pct }}{% endif %}%"></span></div><small>{{ target.quantity_pct|floatformat:1 }}%</small></td><td>{{ target.target_value|floatformat:2 }}</td><td>{{ target.actual_value|floatformat:2 }}</td><td><div class="progress-track"><span style="width:{% if target.value_pct > 100 %}100{% else %}{{ target.value_pct }}{% endif %}%"></span></div><small>{{ target.value_pct|floatformat:1 }}%</small></td><td>{{ target.budget_amount|floatformat:2 }}</td><td>{{ target.actual_cost|floatformat:2 }}</td><td><div class="progress-track"><span style="width:{% if target.budget_used_pct > 100 %}100{% else %}{{ target.budget_used_pct }}{% endif %}%"></span></div><small>{{ target.budget_used_pct|floatformat:1 }}%</small></td></tr>
+  {% empty %}<tr><td colspan="12" class="empty">لا توجد مستهدفات مسجلة لهذه السنة. أضف المستهدفات وموازناتها ثم سجّل الإنجاز الدوري المعتمد.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="payroll-total"><small>ملخص الشركة — إنجاز الكمية {{ target_totals.quantity_pct|floatformat:1 }}% · إنجاز القيمة {{ target_totals.value_pct|floatformat:1 }}% · استهلاك الموازنة {{ target_totals.budget_used_pct|floatformat:1 }}%</small><strong>الموازنة {{ target_totals.budget_amount|floatformat:2 }} ج.م | التكلفة {{ target_totals.actual_cost|floatformat:2 }} ج.م</strong></div>
+</section>
 <p class="notice" style="margin-top:18px">تنبيه: المؤشرات تعكس البيانات المسجلة حاليًا. لا يُعد هذا التقرير اعتمادًا ماليًا، ولا يحسب تكلفة صاحب العمل التأمينية منفصلة ما لم تُسجل ضمن عناصر التكلفة؛ كما أن وجود نموذج بيانات لا يعني أن كل إجراءات الاعتماد أو الخصم الآلي قد اكتملت.</p>
 {% endblock %}
