@@ -1,10 +1,13 @@
 from django.contrib import admin
-from .models import (Department, JobPosition, Employee, EmployeeDocument, AttendanceSite,
-                     AttendanceRecord, LeaveRequest, ApprovalRequest, ApprovalStep, PayrollPeriod, PayrollItem,
-                     LeavePolicy, EmployeeLeaveBalance, RecruitmentCandidate, MissionRequest, AttendanceException,
-                     EmployeeInsuranceRecord, InsuranceFormRecord, SalaryChange, PayrollComponent, EmployeeDeduction,
-                     InternalRegulation, DisciplinaryAction, KPI, PerformanceReview, TrainingCourse, EmployeeTraining,
-                     EmployeeAuditEvent)
+from .models import (
+    Department, JobPosition, Employee, EmployeeDocument, AttendanceSite,
+    AttendanceRecord, LeaveRequest, ApprovalRequest, ApprovalStep, PayrollPeriod, PayrollItem,
+    LeavePolicy, EmployeeLeaveBalance, RecruitmentCandidate, MissionRequest, AttendanceException,
+    EmployeeInsuranceRecord, InsuranceFormRecord, SalaryChange, PayrollComponent, EmployeeDeduction,
+    InternalRegulation, DisciplinaryAction, KPI, PerformanceReview, TrainingCourse, EmployeeTraining,
+    EmployeeAuditEvent, EmployeeRequirement, PositionAssignment, DepartmentWorkforcePlan,
+    AdvancePolicy, EmployeeAdvance, CustodyAsset, CustodyAssignment,
+)
 
 
 @admin.register(Employee)
@@ -15,5 +18,34 @@ class EmployeeAdmin(admin.ModelAdmin):
     autocomplete_fields = ("department", "position", "manager", "user")
 
 
-admin.site.register([Department, JobPosition, EmployeeDocument, AttendanceSite, AttendanceRecord,
-                     LeaveRequest, ApprovalRequest, ApprovalStep, PayrollPeriod, PayrollItem, LeavePolicy, EmployeeLeaveBalance,\n                     RecruitmentCandidate, MissionRequest, AttendanceException, EmployeeInsuranceRecord, InsuranceFormRecord,\n                     SalaryChange, PayrollComponent, EmployeeDeduction, InternalRegulation, DisciplinaryAction, KPI,\n                     PerformanceReview, TrainingCourse, EmployeeTraining, EmployeeAuditEvent])
+@admin.register(DepartmentWorkforcePlan)
+class DepartmentWorkforcePlanAdmin(admin.ModelAdmin):
+    list_display = ("department", "fiscal_year", "approved_headcount", "maximum_headcount",
+                    "approved_monthly_payroll_budget", "approved_annual_payroll_budget")
+    list_filter = ("fiscal_year", "department")
+    search_fields = ("department__name", "department__code")
+
+
+@admin.register(EmployeeRequirement)
+class EmployeeRequirementAdmin(admin.ModelAdmin):
+    list_display = ("employee", "title", "status", "required_by", "submitted_at")
+    list_filter = ("status", "category")
+    search_fields = ("employee__employee_code", "employee__full_name", "title")
+    autocomplete_fields = ("employee", "document", "verified_by")
+
+
+@admin.register(CustodyAsset)
+class CustodyAssetAdmin(admin.ModelAdmin):
+    list_display = ("asset_code", "name", "category", "status", "insured", "insurance_end")
+    list_filter = ("status", "category", "insured")
+    search_fields = ("asset_code", "name", "serial_number", "insurance_policy_number")
+
+
+admin.site.register([
+    Department, JobPosition, EmployeeDocument, AttendanceSite, AttendanceRecord,
+    LeaveRequest, ApprovalRequest, ApprovalStep, PayrollPeriod, PayrollItem,
+    LeavePolicy, EmployeeLeaveBalance, RecruitmentCandidate, MissionRequest, AttendanceException,
+    EmployeeInsuranceRecord, InsuranceFormRecord, SalaryChange, PayrollComponent, EmployeeDeduction,
+    InternalRegulation, DisciplinaryAction, KPI, PerformanceReview, TrainingCourse, EmployeeTraining,
+    EmployeeAuditEvent, PositionAssignment, AdvancePolicy, EmployeeAdvance, CustodyAssignment,
+])
