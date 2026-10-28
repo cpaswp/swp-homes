@@ -2,11 +2,12 @@ import json
 from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from .models import (Employee, Department, AttendanceRecord, LeaveRequest, ApprovalRequest, PayrollPeriod, PayrollItem,
-                     DepartmentWorkforcePlan, EmployeeRequirement, EmployeeDocument, EmployeeAdvance, CustodyAsset, CustodyAssignment, PositionAssignment, EmployeeContract, EmployeeWarning, EmployeeCompensationItem, DepartmentTarget, TargetAchievement)
+                     DepartmentWorkforcePlan, EmployeeRequirement, EmployeeDocument, EmployeeAdvance, CustodyAsset, CustodyAssignment, PositionAssignment, EmployeeContract, EmployeeWarning, EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
+                     Skill, EmployeeSkill, CareerDevelopmentPlan, SuccessionPlan, JobPosition)
 
 
 @login_required
@@ -607,4 +608,107 @@ def recruitment_interviews(request):
         "employees": Employee.objects.filter(status=Employee.Status.ACTIVE).order_by("full_name"),
         "ranking": ranking,
         "stages": RecruitmentInterview.Stage.choices,
+    })
+
+
+
+@login_required
+def talent_center(request):
+    """HR-staff-only talent, skills and succession workspace."""
+    from datetime import date
+    from django.contrib import messages
+    from django.core.exceptions import ValidationError
+    from django.db import IntegrityError, transaction
+
+    if not request.user.is_staff:
+        return HttpResponseForbidden("Access denied")
+
+    english = request.LANGUAGE_CODE == "en"
+    labels = {
+        "created": "Saved successfully." if english else "تم الحفظ بنجاح.",
+        "invalid": "Please review the submitted values." if english else "يرجى مراجعة البيانات المدخلة.",
+        "invalid_dates": "The target date must be on or after the start date." if english else "يجب أن يكون التاريخ المستهدف في تاريخ البداية أو بعده.",
+        "duplicate": "This employee/skill or position/nominee pair already exists." if english else "هذا الربط موجود بالفعل.",
+    }
+
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        try:
+            with transaction.atomic():
+                if action == "skill":
+                    name = request.POST.get("name", "").strip()
+                    if not name:
+                        raise ValueError
+                    Skill.objects.create(
+                        name=name,
+                        category=request.POST.get("category", "").strip(),
+                        description=request.POST.get("description", "").strip(),
+                    )
+                elif action == "assessment":
+                    employee = get_object_or_404(Employee, pk=request.POST.get("employee"))
+                    skill = get_object_or_404(Skill, pk=request.POST.get("skill"), is_active=True)
+                    level = int(request.POST.get("level", "0"))
+                    if level not in range(1, 6):
+                        raise ValueError
+                    EmployeeSkill.objects.update_or_create(
+                        employee=employee, skill=skill,
+                        defaults={
+                            "level": level,
+                            "assessed_by": request.user,
+                            "evidence": request.POST.get("evidence", "").strip(),
+                            "next_review_date": date.fromisoformat(request.POST["next_review_date"]) if request.POST.get("next_review_date") else None,
+                        },
+                    )
+                elif action == "development":
+                    employee = get_object_or_404(Employee, pk=request.POST.get("employee"))
+                    start = date.fromisoformat(request.POST["start_date"]) if request.POST.get("start_date") else None
+                    target = date.fromisoformat(request.POST["target_date"]) if request.POST.get("target_date") else None
+                    if start and target and target < start:
+                        messages.error(request, labels["invalid_dates"])
+                        return redirect("hr:talent_center")
+                    title = request.POST.get("title", "").strip()
+                    objective = request.POST.get("objective", "").strip()
+                    if not title or not objective:
+                        raise ValueError
+                    CareerDevelopmentPlan.objects.create(
+                        employee=employee, title=title, objective=objective,
+                        actions=request.POST.get("actions", "").strip(),
+                        start_date=start, target_date=target, owner=request.user,
+                        status=CareerDevelopmentPlan.Status.ACTIVE,
+                    )
+                elif action == "succession":
+                    position = get_object_or_404(JobPosition, pk=request.POST.get("position"), is_active=True)
+                    nominee = get_object_or_404(Employee, pk=request.POST.get("nominee"), status=Employee.Status.ACTIVE)
+                    if not request.POST.get("readiness") in dict(SuccessionPlan.Readiness.choices):
+                        raise ValueError
+                    SuccessionPlan.objects.create(
+                        position=position, nominee=nominee,
+                        readiness=request.POST["readiness"],
+                        development_needs=request.POST.get("development_needs", "").strip(),
+                        risk_notes=request.POST.get("risk_notes", "").strip(),
+                        reviewed_by=request.user, reviewed_at=date.today(),
+                    )
+                else:
+                    raise ValueError
+            messages.success(request, labels["created"])
+        except IntegrityError:
+            messages.error(request, labels["duplicate"])
+        except (ValueError, TypeError, ValidationError, KeyError):
+            messages.error(request, labels["invalid"])
+        return redirect("hr:talent_center")
+
+    employees = Employee.objects.filter(status=Employee.Status.ACTIVE).select_related("department", "position").order_by("full_name")
+    return render(request, "hr/talent_center.html", {
+        "skills": Skill.objects.filter(is_active=True),
+        "assessments": EmployeeSkill.objects.select_related("employee", "skill", "assessed_by").all()[:100],
+        "development_plans": CareerDevelopmentPlan.objects.select_related("employee", "owner").all()[:100],
+        "succession_plans": SuccessionPlan.objects.filter(is_active=True).select_related("position", "nominee", "reviewed_by").all()[:100],
+        "employees": employees,
+        "positions": JobPosition.objects.filter(is_active=True).select_related("department").order_by("title"),
+        "readiness_choices": SuccessionPlan.Readiness.choices,
+        "skill_count": Skill.objects.filter(is_active=True).count(),
+        "assessment_count": EmployeeSkill.objects.count(),
+        "active_development_count": CareerDevelopmentPlan.objects.filter(status=CareerDevelopmentPlan.Status.ACTIVE).count(),
+        "critical_positions_covered": SuccessionPlan.objects.filter(is_active=True).values("position_id").distinct().count(),
+        "english": english,
     })
