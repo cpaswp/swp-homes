@@ -1297,6 +1297,12 @@ class EmployeeOfTheMonthSettings(models.Model):
         verbose_name = "إعدادات الموظف المثالي"
         verbose_name_plural = "إعدادات الموظف المثالي"
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        total = self.performance_weight + self.appearance_weight + self.behavior_weight + self.commitment_weight
+        if total != Decimal("100.00"):
+            raise ValidationError("يجب أن يكون مجموع أوزان التقييم 100%.")
+
     def __str__(self):
         return "إعدادات احتساب الموظف المثالي"
 
