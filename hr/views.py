@@ -661,6 +661,7 @@ def talent_center(request):
                         employee=employee, skill=skill,
                         defaults={
                             "level": level,
+                            "assessed_at": date.today(),
                             "assessed_by": request.user,
                             "evidence": request.POST.get("evidence", "").strip(),
                             "next_review_date": date.fromisoformat(request.POST["next_review_date"]) if request.POST.get("next_review_date") else None,
