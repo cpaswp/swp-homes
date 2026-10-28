@@ -5,7 +5,8 @@ from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from .models import (Employee, Department, AttendanceRecord, LeaveRequest, ApprovalRequest, PayrollPeriod, PayrollItem,\n                     DepartmentWorkforcePlan, EmployeeRequirement, EmployeeDocument, EmployeeAdvance,\n                     CustodyAsset, CustodyAssignment, PositionAssignment)
+from .models import (Employee, Department, AttendanceRecord, LeaveRequest, ApprovalRequest, PayrollPeriod, PayrollItem,
+                     DepartmentWorkforcePlan, EmployeeRequirement, EmployeeDocument, EmployeeAdvance,\n                     CustodyAsset, CustodyAssignment, PositionAssignment)
 
 
 @login_required
