@@ -83,7 +83,7 @@ class TalentCenterTests(TestCase):
         url = reverse("hr:talent_center")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "مصفوفة المهارات")
+        self.assertContains(response, "المهارات النشطة")
         response = self.client.post(url, {
             "action": "skill", "name": "تحليل البيانات", "category": "تقنية",
             "description": "مهارة تحليلية"
