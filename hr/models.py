@@ -1036,3 +1036,66 @@ class AttendanceDeviceConfiguration(models.Model):
         verbose_name_plural = 'إعدادات ماكينات الحضور'
     def __str__(self):
         return f'{self.manufacturer} {self.model_name} — {self.name}'
+
+
+class RegulationRule(models.Model):
+    class RuleType(models.TextChoices):
+        ALLOWANCE = "allowance", "مسموح / استحقاق"
+        PROHIBITION = "prohibition", "ممنوع"
+        LIMIT = "limit", "حد أقصى / قيد"
+        APPROVAL = "approval", "يتطلب موافقة"
+        LEGAL_REQUIREMENT = "legal", "التزام قانوني"
+    code = models.CharField("كود القاعدة", max_length=50, unique=True)
+    title = models.CharField("عنوان القاعدة", max_length=180)
+    rule_type = models.CharField("نوع القاعدة", max_length=20, choices=RuleType.choices)
+    scope = models.CharField("النطاق / العملية", max_length=100, help_text="مثال: إجازات، خصومات، عهد، مصوغات تعيين")
+    description = models.TextField("تفاصيل القاعدة")
+    source_type = models.CharField("مصدر القاعدة", max_length=30, choices=[("company","لائحة الشركة"),("law","قانون / قرار رسمي"),("contract","عقد العمل"),("policy","سياسة داخلية")], default="company")
+    source_reference = models.CharField("مرجع المادة أو القرار", max_length=180, blank=True)
+    effective_from = models.DateField("ساري من")
+    effective_to = models.DateField("ساري حتى", null=True, blank=True)
+    limit_value = models.DecimalField("قيمة الحد إن وجدت", max_digits=14, decimal_places=2, null=True, blank=True)
+    limit_unit = models.CharField("وحدة الحد", max_length=40, blank=True)
+    requires_approval = models.BooleanField("يتطلب اعتمادًا", default=False)
+    active = models.BooleanField("نشطة", default=True)
+    document = models.FileField("مستند مرجعي", upload_to="hr/regulations/rules/%Y/%m/", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["scope", "code"]
+        verbose_name = "قاعدة لائحة / امتثال"
+        verbose_name_plural = "قواعد اللوائح والقانون والامتثال"
+    def __str__(self):
+        return f"{self.code} — {self.title}"
+
+
+class HiringDocumentTemplate(models.Model):
+    class Category(models.TextChoices):
+        IDENTITY = "identity", "إثبات شخصية"
+        EDUCATION = "education", "مؤهل دراسي"
+        EXPERIENCE = "experience", "خبرة"
+        MEDICAL = "medical", "طبي"
+        INSURANCE = "insurance", "تأمينات"
+        TAX = "tax", "ضرائب"
+        BANK = "bank", "بيانات بنكية"
+        CONTRACT = "contract", "عقد / عرض عمل"
+        OTHER = "other", "أخرى"
+    code = models.CharField("كود المصوغ", max_length=40, unique=True)
+    title = models.CharField("اسم مصوغ التعيين", max_length=180)
+    category = models.CharField("التصنيف", max_length=20, choices=Category.choices, default=Category.OTHER)
+    description = models.TextField("الوصف أو متطلبات القبول", blank=True)
+    mandatory = models.BooleanField("إلزامي", default=True)
+    applies_to = models.CharField("ينطبق على", max_length=120, default="all", help_text="all أو نوع وظيفة/فئة موظفين")
+    due_days_after_hire = models.PositiveSmallIntegerField("مهلة التسليم بعد التعيين بالأيام", default=0)
+    has_expiry = models.BooleanField("له تاريخ صلاحية", default=False)
+    default_validity_months = models.PositiveSmallIntegerField("الصلاحية الافتراضية بالشهور", null=True, blank=True)
+    alert_days_before_expiry = models.PositiveSmallIntegerField("التنبيه قبل الانتهاء بالأيام", default=30)
+    requires_original = models.BooleanField("يتطلب أصل المستند", default=False)
+    active = models.BooleanField("نشط", default=True)
+    sort_order = models.PositiveSmallIntegerField("ترتيب العرض", default=100)
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["sort_order", "title"]
+        verbose_name = "تعريف مصوغ تعيين"
+        verbose_name_plural = "مصوغات التعيين المطلوبة"
+    def __str__(self):
+        return f"{self.code} — {self.title}"
