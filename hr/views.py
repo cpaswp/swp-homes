@@ -135,6 +135,25 @@ def management_reports(request):
     advance_totals = active_advances.aggregate(
         outstanding=Sum("remaining_balance"), count=Count("id")
     )
+    target_rows = list(DepartmentTarget.objects.filter(fiscal_year=year).select_related("department", "owner").prefetch_related("achievements").order_by("department__name", "name"))
+    target_totals = {"target_quantity": Decimal("0"), "actual_quantity": Decimal("0"), "target_value": Decimal("0"), "actual_value": Decimal("0"), "budget_amount": Decimal("0"), "actual_cost": Decimal("0")}
+    for target in target_rows:
+        achievements = [a for a in target.achievements.all() if a.verified]
+        target.actual_quantity = sum((a.actual_quantity for a in achievements), Decimal("0"))
+        target.actual_value = sum((a.actual_value for a in achievements), Decimal("0"))
+        target.actual_cost = sum((a.actual_cost for a in achievements), Decimal("0"))
+        target.quantity_pct = min(target.actual_quantity / target.target_quantity * 100, Decimal("999.99")) if target.target_quantity else Decimal("0")
+        target.value_pct = min(target.actual_value / target.target_value * 100, Decimal("999.99")) if target.target_value else Decimal("0")
+        target.budget_used_pct = min(target.actual_cost / target.budget_amount * 100, Decimal("999.99")) if target.budget_amount else Decimal("0")
+        for key in target_totals:
+            target_totals[key] += getattr(target, key)
+    target_totals["quantity_pct"] = target_totals["actual_quantity"] / target_totals["target_quantity"] * 100 if target_totals["target_quantity"] else Decimal("0")
+    target_totals["value_pct"] = target_totals["actual_value"] / target_totals["target_value"] * 100 if target_totals["target_value"] else Decimal("0")
+    target_totals["budget_used_pct"] = target_totals["actual_cost"] / target_totals["budget_amount"] * 100 if target_totals["budget_amount"] else Decimal("0")
+    active_contracts = EmployeeContract.objects.filter(status=EmployeeContract.Status.ACTIVE)
+    contracts_expiring = active_contracts.filter(end_date__gte=today, end_date__lte=today + timedelta(days=60)).count()
+    contracts_expired = EmployeeContract.objects.filter(end_date__lt=today, status=EmployeeContract.Status.ACTIVE).count()
+    open_warnings = EmployeeWarning.objects.filter(status__in=[EmployeeWarning.Status.ISSUED, EmployeeWarning.Status.UNDER_REVIEW]).count()
     current_assignments = PositionAssignment.objects.filter(
         status=PositionAssignment.Status.ACTIVE, start_date__lte=today
     ).filter(Q(end_date__isnull=True) | Q(end_date__gte=today))
