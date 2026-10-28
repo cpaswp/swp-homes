@@ -56,3 +56,59 @@ class HRScreenTests(TestCase):
         self.assertContains(response, "تكلفة المرتبات حسب الإدارة")
         self.assertContains(response, "العمليات")
         self.assertContains(response, "25000.00")
+
+class TalentCenterTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="talent-admin", password="a-strong-test-password", is_staff=True
+        )
+        self.department = Department.objects.create(code="TAL", name="المواهب")
+        self.position = JobPosition.objects.create(code="TAL-01", title="أخصائي مواهب", department=self.department)
+        self.employee = Employee.objects.create(
+            employee_code="TAL-EMP-01", full_name="موظف اختبار المواهب",
+            department=self.department, position=self.position, date_of_birth=date(1990, 1, 1)
+        )
+
+    def test_talent_center_is_staff_only(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        regular = get_user_model().objects.create_user(username="regular-talent", password="password-12345")
+        self.client.force_login(regular)
+        response = self.client.get(reverse("hr:talent_center"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_staff_can_create_skill_and_assessment(self):
+        from django.urls import reverse
+        self.client.force_login(self.user)
+        url = reverse("hr:talent_center")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "مصفوفة المهارات")
+        response = self.client.post(url, {
+            "action": "skill", "name": "تحليل البيانات", "category": "تقنية",
+            "description": "مهارة تحليلية"
+        })
+        self.assertEqual(response.status_code, 302)
+        from .models import Skill, EmployeeSkill
+        skill = Skill.objects.get(name="تحليل البيانات")
+        response = self.client.post(url, {
+            "action": "assessment", "employee": self.employee.pk, "skill": skill.pk,
+            "level": "4", "evidence": "تقييم عملي", "next_review_date": "2027-01-15"
+        })
+        self.assertEqual(response.status_code, 302)
+        assessment = EmployeeSkill.objects.get(employee=self.employee, skill=skill)
+        self.assertEqual(assessment.level, 4)
+        self.assertEqual(assessment.assessed_by, self.user)
+
+    def test_development_plan_rejects_target_before_start(self):
+        from django.urls import reverse
+        from .models import CareerDevelopmentPlan
+        self.client.force_login(self.user)
+        response = self.client.post(reverse("hr:talent_center"), {
+            "action": "development", "employee": self.employee.pk,
+            "title": "تطوير القيادة", "objective": "إدارة فريق",
+            "start_date": "2027-03-01", "target_date": "2027-02-01",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(CareerDevelopmentPlan.objects.count(), 0)
+
