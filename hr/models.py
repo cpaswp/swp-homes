@@ -750,3 +750,84 @@ class EmployeeWarning(models.Model):
         ordering = ["-incident_date"]
         verbose_name = "إنذار موظف"
         verbose_name_plural = "إنذارات الموظفين"
+
+
+class EmployeeCompensationItem(models.Model):
+    class Kind(models.TextChoices):
+        ALLOWANCE = "allowance", "بدل"
+        BONUS = "bonus", "مكافأة"
+        COMMISSION = "commission", "عمولة"
+        OVERTIME = "overtime", "إضافي"
+        DEDUCTION = "deduction", "استقطاع"
+        PENALTY = "penalty", "جزاء مالي"
+        EMPLOYEE_INSURANCE = "employee_insurance", "حصة الموظف بالتأمينات"
+        TAX = "tax", "ضريبة"
+        ADVANCE_REPAYMENT = "advance_repayment", "قسط سلفة"
+        OTHER = "other", "أخرى"
+    class Frequency(models.TextChoices):
+        ONE_TIME = "one_time", "مرة واحدة"
+        MONTHLY = "monthly", "شهري"
+        QUARTERLY = "quarterly", "ربع سنوي"
+        ANNUAL = "annual", "سنوي"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="compensation_items", verbose_name="الموظف")
+    kind = models.CharField("نوع البند", max_length=30, choices=Kind.choices)
+    name = models.CharField("اسم البند", max_length=160)
+    amount = models.DecimalField("المبلغ", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    frequency = models.CharField("التكرار", max_length=20, choices=Frequency.choices, default=Frequency.MONTHLY)
+    effective_from = models.DateField("ساري من")
+    effective_to = models.DateField("ساري حتى", null=True, blank=True)
+    taxable = models.BooleanField("خاضع للضريبة", default=True)
+    insured = models.BooleanField("خاضع للتأمينات", default=True)
+    approved = models.BooleanField("معتمد", default=False)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, null=True, blank=True, related_name="compensation_items", verbose_name="طلب الاعتماد")
+    payroll_item = models.ForeignKey(PayrollItem, on_delete=models.SET_NULL, null=True, blank=True, related_name="compensation_sources", verbose_name="بند المرتب الناتج")
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["employee", "kind", "effective_from"]
+        verbose_name = "استحقاق/استقطاع موظف"
+        verbose_name_plural = "بدلات ومكافآت واستحقاقات واستبعادات الموظفين"
+
+
+class DepartmentTarget(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        APPROVED = "approved", "معتمد"
+        ACTIVE = "active", "قيد التنفيذ"
+        CLOSED = "closed", "مغلق"
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="targets", verbose_name="الإدارة")
+    code = models.CharField("كود المستهدف", max_length=40)
+    name = models.CharField("المستهدف", max_length=180)
+    description = models.TextField("الوصف/معيار القياس", blank=True)
+    owner = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="owned_targets", verbose_name="المسؤول")
+    fiscal_year = models.PositiveSmallIntegerField("السنة المالية")
+    unit = models.CharField("وحدة القياس", max_length=50, default="وحدة")
+    target_quantity = models.DecimalField("الكمية المستهدفة", max_digits=15, decimal_places=3, default=Decimal("0"), validators=[MinValueValidator(0)])
+    target_value = models.DecimalField("القيمة المستهدفة", max_digits=15, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    budget_amount = models.DecimalField("الموازنة المعتمدة", max_digits=15, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    start_date = models.DateField("بداية المستهدف")
+    end_date = models.DateField("نهاية المستهدف")
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, null=True, blank=True, related_name="department_targets", verbose_name="طلب الاعتماد")
+    class Meta:
+        unique_together = [("department", "code", "fiscal_year")]
+        ordering = ["department__name", "fiscal_year", "name"]
+        verbose_name = "مستهدف إدارة"
+        verbose_name_plural = "مستهدفات الإدارات وموازناتها"
+
+
+class TargetAchievement(models.Model):
+    target = models.ForeignKey(DepartmentTarget, on_delete=models.PROTECT, related_name="achievements", verbose_name="المستهدف")
+    period_start = models.DateField("بداية الفترة")
+    period_end = models.DateField("نهاية الفترة")
+    actual_quantity = models.DecimalField("الكمية المنجزة", max_digits=15, decimal_places=3, default=Decimal("0"), validators=[MinValueValidator(0)])
+    actual_value = models.DecimalField("القيمة المنجزة", max_digits=15, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    actual_cost = models.DecimalField("التكلفة الفعلية", max_digits=15, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    source_reference = models.CharField("مرجع المصدر", max_length=160, blank=True)
+    verified = models.BooleanField("تم التحقق", default=False)
+    notes = models.TextField("ملاحظات", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        unique_together = [("target", "period_start", "period_end")]
+        ordering = ["period_start"]
+        verbose_name = "إنجاز مستهدف"
+        verbose_name_plural = "الإنجاز الفعلي للمستهدفات"
