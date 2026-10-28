@@ -118,6 +118,19 @@ def management_reports(request):
                 row[key] = row[key] or Decimal("0")
                 payroll_totals[key] += row[key]
 
+    compensation_pending_rows = []
+    compensation_pending_total = Decimal("0")
+    if selected_period:
+        compensation_pending_rows = list(
+            EmployeeCompensationItem.objects.filter(
+                approved=True, payroll_item__isnull=True,
+                effective_from__lte=selected_period.end_date
+            ).filter(Q(effective_to__isnull=True) | Q(effective_to__gte=selected_period.start_date))
+            .values("employee__department__name", "kind")
+            .annotate(amount_total=Sum("amount"), item_count=Count("id"))
+            .order_by("employee__department__name", "kind")
+        )
+        compensation_pending_total = sum((row["amount_total"] or Decimal("0") for row in compensation_pending_rows), Decimal("0"))
     overdue_requirements = EmployeeRequirement.objects.filter(
         status=EmployeeRequirement.Status.REQUIRED, required_by__lt=today
     ).count()
@@ -164,7 +177,7 @@ def management_reports(request):
         "active_employee_count": active_employees.count(),
         "department_count": Department.objects.filter(is_active=True).count(),
         "headcount_by_department": headcount_by_department,
-        "payroll_rows": payroll_rows, "payroll_totals": payroll_totals,
+        "payroll_rows": payroll_rows, "payroll_totals": payroll_totals,\n        "compensation_pending_rows": compensation_pending_rows, "compensation_pending_total": compensation_pending_total,
         "overdue_requirements": overdue_requirements, "missing_documents": missing_documents,
         "expired_documents": expired_documents, "expiring_assets": expiring_assets,
         "uninsured_assigned_assets": uninsured_assigned_assets,
