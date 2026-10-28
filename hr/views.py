@@ -326,11 +326,11 @@ def excel_center(request):
             sheet = workbook.active
             rows = sheet.iter_rows(values_only=True)
             headers = next(rows, None)
-            allowed = {field.name: field for field, _ in _excel_fields(model)}
+            allowed = {attr: field for field, attr in _excel_fields(model)}
             if not headers:
                 raise ValueError("الملف فارغ.")
             header_names = [str(x).strip() if x is not None else "" for x in headers]
-            unknown = [x for x in header_names if x and x not in allowed]
+            unknown = [x for x in header_names if x and x != "id" and x not in allowed]
             if unknown:
                 raise ValueError("أعمدة غير معروفة: " + ", ".join(unknown[:8]) + ". صدّر قالب الجدول أولًا.")
             imported = 0
@@ -347,7 +347,7 @@ def excel_center(request):
                             obj = model.objects.select_for_update().get(pk=int(obj_id))
                             for name, value in data.items():
                                 field = allowed[name]
-                                setattr(obj, name, _coerce_excel_value(field, value))
+                                setattr(obj, field.attname if (field.many_to_one or field.one_to_one) else field.name, _coerce_excel_value(field, value))
                             obj.save()
                         else:
                             kwargs = {}
@@ -407,7 +407,7 @@ def excel_export(request, model_name):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Data"
-    headers = ["id"] + [f.name for f, _ in fields]
+    headers = ["id"] + [attr for _, attr in fields]
     sheet.append(headers)
     sheet.freeze_panes = "A2"
     sheet.auto_filter.ref = sheet.dimensions
