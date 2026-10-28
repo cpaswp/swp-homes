@@ -906,6 +906,41 @@ def employee_fund_center(request):
                         scheduled_date=date.fromisoformat(request.POST["scheduled_date"]) if request.POST.get("scheduled_date") else None,
                         expected_amount=expected,
                     )
+                elif action == "claim_pay":
+                    claim = get_object_or_404(EmployeeEmergencyClaim.objects.select_for_update(), pk=request.POST.get("claim"))
+                    if claim.status != EmployeeEmergencyClaim.Status.APPROVED or not claim.approved_amount:
+                        raise ValueError("يجب اعتماد الطلب وتحديد مبلغ الصرف أولًا")
+                    collected = EmployeeFundContribution.objects.filter(status__in=("deducted", "reconciled")).aggregate(total=Sum("emergency_amount"))["total"] or Decimal("0")
+                    already_paid = EmployeeEmergencyClaim.objects.filter(status=EmployeeEmergencyClaim.Status.PAID).aggregate(total=Sum("approved_amount"))["total"] or Decimal("0")
+                    if claim.approved_amount > collected - already_paid:
+                        raise ValueError("رصيد صندوق الطوارئ المتاح لا يكفي للمبلغ المعتمد")
+                    claim.status = EmployeeEmergencyClaim.Status.PAID
+                    claim.paid_at = date.today()
+                    claim.save(update_fields=["status", "paid_at"])
+                elif action == "turn_decision":
+                    turn = get_object_or_404(EmployeeAssociationTurn.objects.select_for_update(), pk=request.POST.get("turn"))
+                    decision = request.POST.get("decision")
+                    if decision == "approved":
+                        if turn.status != EmployeeAssociationTurn.Status.QUEUED:
+                            raise ValueError("لا يمكن اعتماد هذا الدور في حالته الحالية")
+                        turn.status = EmployeeAssociationTurn.Status.APPROVED
+                        turn.approval_reference = request.POST.get("approval_reference", "").strip()
+                        if not turn.approval_reference:
+                            raise ValueError("مرجع اعتماد الإدارة مطلوب")
+                    elif decision == "paid":
+                        if turn.status != EmployeeAssociationTurn.Status.APPROVED:
+                            raise ValueError("يجب اعتماد الدور قبل الصرف")
+                        amount = Decimal(request.POST.get("actual_paid_amount", "0"))
+                        collected = EmployeeFundContribution.objects.filter(status__in=("deducted", "reconciled")).aggregate(total=Sum("association_amount"))["total"] or Decimal("0")
+                        already_paid = EmployeeAssociationTurn.objects.filter(status=EmployeeAssociationTurn.Status.PAID).aggregate(total=Sum("actual_paid_amount"))["total"] or Decimal("0")
+                        if amount <= 0 or amount > collected - already_paid:
+                            raise ValueError("المبلغ غير صحيح أو رصيد الجمعية غير كافٍ")
+                        turn.actual_paid_amount = amount
+                        turn.status = EmployeeAssociationTurn.Status.PAID
+                        turn.paid_at = date.today()
+                    else:
+                        raise ValueError("قرار غير صحيح")
+                    turn.save()
                 elif action == "claim_decision":
                     claim = get_object_or_404(EmployeeEmergencyClaim.objects.select_for_update(), pk=request.POST.get("claim"))
                     decision = request.POST.get("decision")
