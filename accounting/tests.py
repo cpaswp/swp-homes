@@ -87,4 +87,21 @@ def test_posting_rejects_closed_fiscal_period():
     entry.refresh_from_db()
     assert entry.status == "draft"
 
+@pytest.mark.django_db
+def test_posting_rejects_overlapping_fiscal_periods():
+    company = Company.objects.create(name="شركة فترات متداخلة")
+    FiscalPeriod.objects.create(company=company, name="2026-A", start_date=date(2026,1,1), end_date=date(2026,12,31))
+    FiscalPeriod.objects.create(company=company, name="2026-B", start_date=date(2026,10,1), end_date=date(2027,3,31))
+    cash = Account.objects.create(company=company, code="1100", name="الصندوق", account_type="asset")
+    revenue = Account.objects.create(company=company, code="4100", name="الإيراد", account_type="revenue")
+    entry = JournalEntry.objects.create(company=company, entry_number="JV-OVERLAP", entry_date=date(2026,10,15), description="اختبار تداخل الفترات")
+    JournalLine.objects.create(entry=entry, account=cash, debit=Decimal("100.00"))
+    JournalLine.objects.create(entry=entry, account=revenue, credit=Decimal("100.00"))
+
+    with pytest.raises(PostingError, match="Multiple fiscal periods"):
+        post_journal_entry(entry.id)
+
+    entry.refresh_from_db()
+    assert entry.status == "draft"
+
 
