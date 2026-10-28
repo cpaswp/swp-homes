@@ -1,4 +1,5 @@
 from django.db import migrations, models
+from django.conf import settings
 import django.db.models.deletion
 
 class Migration(migrations.Migration):
@@ -20,7 +21,7 @@ class Migration(migrations.Migration):
                 ("notes", models.TextField(blank=True, verbose_name="ملاحظات")),
                 ("uploaded_at", models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الرفع")),
                 ("content_type", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="contenttypes.contenttype", verbose_name="نوع السجل")),
-                ("uploaded_by", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to="auth.user", verbose_name="رفع بواسطة")),
+                ("uploaded_by", models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL, verbose_name="رفع بواسطة")),
             ],
             options={"ordering":["-uploaded_at"],"verbose_name":"مرفق مستند لسجل","verbose_name_plural":"مرفقات المستندات والسجلات"},
         ),
