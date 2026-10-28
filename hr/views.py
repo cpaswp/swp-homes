@@ -374,7 +374,7 @@ def excel_center(request):
         "models": [{"name": m.__name__, "label": m._meta.verbose_name_plural} for m in model_list],
         "selected": selected,
         "selected_label": model._meta.verbose_name_plural if model else "",
-        "fields": [{"name": f.name, "label": str(f.verbose_name)} for f, _ in _excel_fields(model)] if model else [],
+        "fields": [{"name": attr, "label": str(f.verbose_name)} for f, attr in _excel_fields(model)] if model else [],
     })
 
 def _coerce_excel_value(field, value):
