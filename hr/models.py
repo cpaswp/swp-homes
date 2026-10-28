@@ -1283,3 +1283,158 @@ class SuccessionPlan(models.Model):
     def __str__(self):
         return f"{self.position} ← {self.nominee}"
 
+class EmployeeOfTheMonthSettings(models.Model):
+    """Configurable, transparent weights for the employee excellence dashboard."""
+    performance_weight = models.DecimalField("وزن الأداء %", max_digits=5, decimal_places=2, default=Decimal("40.00"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    appearance_weight = models.DecimalField("وزن الهيئة المهنية %", max_digits=5, decimal_places=2, default=Decimal("15.00"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    behavior_weight = models.DecimalField("وزن السلوك %", max_digits=5, decimal_places=2, default=Decimal("20.00"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    commitment_weight = models.DecimalField("وزن الالتزام %", max_digits=5, decimal_places=2, default=Decimal("25.00"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    minimum_reviews = models.PositiveSmallIntegerField("الحد الأدنى للتقييمات", default=1)
+    minimum_score = models.DecimalField("الحد الأدنى للترشيح", max_digits=5, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "إعدادات الموظف المثالي"
+        verbose_name_plural = "إعدادات الموظف المثالي"
+
+    def __str__(self):
+        return "إعدادات احتساب الموظف المثالي"
+
+
+class EmployeeFundPolicy(models.Model):
+    """Configurable employee association and emergency mutual-aid policy."""
+    name = models.CharField("اسم الصندوق", max_length=160, default="صندوق الزمالة والجمعية")
+    monthly_deduction_amount = models.DecimalField("الاستقطاع الشهري لكل موظف", max_digits=12, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(0)])
+    emergency_share_percent = models.DecimalField("نسبة صندوق الطوارئ %", max_digits=5, decimal_places=2, default=Decimal("10.00"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    association_share_percent = models.DecimalField("نسبة قسط الجمعية %", max_digits=5, decimal_places=2, default=Decimal("90.00"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    effective_from = models.DateField("ساري من")
+    effective_to = models.DateField("ساري حتى", null=True, blank=True)
+    active = models.BooleanField("نشط", default=True)
+    requires_approval = models.BooleanField("يتطلب اعتماد الإدارة", default=True)
+    notes = models.TextField("ملاحظات ومرجع قرار الإدارة", blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-effective_from"]
+        verbose_name = "سياسة صندوق العاملين"
+        verbose_name_plural = "سياسات صندوق العاملين"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.emergency_share_percent + self.association_share_percent != Decimal("100.00"):
+            raise ValidationError("يجب أن يكون مجموع نسبة الطوارئ ونسبة الجمعية 100%.")
+
+    def __str__(self):
+        return self.name
+
+
+class EmployeeFundMembership(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "مشترك"
+        PAUSED = "paused", "موقوف مؤقتًا"
+        WITHDRAWN = "withdrawn", "منسحب"
+
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="fund_memberships", verbose_name="الموظف")
+    policy = models.ForeignKey(EmployeeFundPolicy, on_delete=models.PROTECT, related_name="memberships", verbose_name="سياسة الصندوق")
+    monthly_amount = models.DecimalField("الاستقطاع الشهري المتفق عليه", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    joined_on = models.DateField("تاريخ الاشتراك")
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    consent_reference = models.CharField("مرجع موافقة الموظف", max_length=160, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["employee__employee_code"]
+        constraints = [
+            models.UniqueConstraint(fields=["employee", "policy"], name="hr_unique_employee_fund_membership"),
+        ]
+        verbose_name = "اشتراك موظف في الصندوق"
+        verbose_name_plural = "اشتراكات صندوق العاملين"
+
+
+class EmployeeFundContribution(models.Model):
+    class Status(models.TextChoices):
+        PLANNED = "planned", "مجدول"
+        DEDUCTED = "deducted", "مستقطع من الراتب"
+        RECONCILED = "reconciled", "تمت المطابقة"
+        REVERSED = "reversed", "ملغى/معكوس"
+
+    membership = models.ForeignKey(EmployeeFundMembership, on_delete=models.PROTECT, related_name="contributions", verbose_name="الاشتراك")
+    period = models.ForeignKey(PayrollPeriod, on_delete=models.PROTECT, related_name="fund_contributions", verbose_name="فترة المرتب")
+    gross_amount = models.DecimalField("إجمالي الاستقطاع", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    emergency_amount = models.DecimalField("حصة الطوارئ", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    association_amount = models.DecimalField("قسط الجمعية", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.PLANNED)
+    payroll_item = models.ForeignKey(PayrollItem, on_delete=models.PROTECT, null=True, blank=True, related_name="fund_contributions", verbose_name="بند المرتب")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["period__start_date", "membership__employee__employee_code"]
+        constraints = [
+            models.UniqueConstraint(fields=["membership", "period"], name="hr_unique_fund_contribution_period"),
+        ]
+        verbose_name = "استقطاع صندوق العاملين"
+        verbose_name_plural = "استقطاعات صندوق العاملين"
+
+
+class EmployeeAssociationTurn(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = "queued", "في انتظار الدور"
+        APPROVED = "approved", "معتمد للصرف"
+        PAID = "paid", "تم الصرف"
+        CANCELLED = "cancelled", "ملغى"
+
+    membership = models.ForeignKey(EmployeeFundMembership, on_delete=models.PROTECT, related_name="association_turns", verbose_name="المشترك")
+    cycle_name = models.CharField("اسم دورة الجمعية", max_length=120)
+    turn_number = models.PositiveIntegerField("ترتيب الدور")
+    scheduled_date = models.DateField("تاريخ الدور المتوقع", null=True, blank=True)
+    expected_amount = models.DecimalField("قيمة الجمعية المتوقعة", max_digits=12, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(0)])
+    actual_paid_amount = models.DecimalField("المبلغ المصروف فعليًا", max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.QUEUED)
+    approval_reference = models.CharField("مرجع الاعتماد", max_length=160, blank=True)
+    paid_at = models.DateField("تاريخ الصرف", null=True, blank=True)
+    notes = models.TextField("ملاحظات", blank=True)
+
+    class Meta:
+        ordering = ["cycle_name", "turn_number"]
+        constraints = [
+            models.UniqueConstraint(fields=["cycle_name", "turn_number"], name="hr_unique_association_cycle_turn"),
+            models.UniqueConstraint(fields=["cycle_name", "membership"], name="hr_unique_membership_per_association_cycle"),
+        ]
+        verbose_name = "دور جمعية العاملين"
+        verbose_name_plural = "أدوار جمعية العاملين"
+
+
+class EmployeeEmergencyClaim(models.Model):
+    class Status(models.TextChoices):
+        SUBMITTED = "submitted", "مقدم"
+        UNDER_REVIEW = "under_review", "قيد المراجعة"
+        APPROVED = "approved", "معتمد"
+        PAID = "paid", "تم الصرف"
+        REJECTED = "rejected", "مرفوض"
+
+    class EventType(models.TextChoices):
+        ACCIDENT = "accident", "حادث"
+        MEDICAL = "medical", "طارئ صحي"
+        DEATH = "death", "وفاة"
+        FIRE = "fire", "حريق/حادث ممتلكات"
+        OTHER = "other", "ظرف طارئ آخر"
+
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="emergency_fund_claims", verbose_name="الموظف")
+    event_type = models.CharField("نوع الظرف", max_length=20, choices=EventType.choices)
+    event_date = models.DateField("تاريخ الحدث")
+    description = models.TextField("تفاصيل الحدث")
+    requested_amount = models.DecimalField("المبلغ المطلوب", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    approved_amount = models.DecimalField("المبلغ المعتمد", max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.SUBMITTED)
+    reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_emergency_claims", verbose_name="المراجع")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateField("تاريخ الصرف", null=True, blank=True)
+    decision_notes = models.TextField("قرار وملاحظات الاعتماد", blank=True)
+    attachment = models.FileField("مستندات مؤيدة", upload_to="hr/employee_fund/claims/%Y/%m/", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-event_date", "-created_at"]
+        verbose_name = "طلب مساعدة من صندوق الطوارئ"
+        verbose_name_plural = "طلبات صندوق الطوارئ"
+
