@@ -40,8 +40,12 @@ def dashboard(request):
         return render(request, "core/no_company.html", {"language": language})
     company = membership.company
     charges = LeaseCharge.objects.filter(company=company).exclude(status="void")
+    # Aggregate charges separately from allocations: joining the reverse relation
+    # duplicates each charge amount when it has multiple allocations.
     charge_total = charges.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
-    allocation_total = charges.aggregate(total=Sum("allocations__amount"))["total"] or Decimal("0.00")
+    allocation_total = LeaseCharge.objects.filter(company=company).exclude(status="void").aggregate(
+        total=Sum("allocations__amount")
+    )["total"] or Decimal("0.00")
     outstanding = max(Decimal("0.00"), charge_total - allocation_total)
     context = {
         "language": language, "memberships": memberships, "active_company": company,
