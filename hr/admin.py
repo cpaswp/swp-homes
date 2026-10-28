@@ -8,6 +8,8 @@ from .models import (
     EmployeeAuditEvent, EmployeeRequirement, PositionAssignment, DepartmentWorkforcePlan,
     AdvancePolicy, EmployeeAdvance, CustodyAsset, CustodyAssignment, EmployeeContract, EmployeeWarning,
     EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
+    OfferLetter, EmployeeDependent, EmployeeMedicalBenefit, EmployeeHousingAssignment,
+    EmployeeChildcareBenefit, EmployeeBenefitEnrollment,
 )
 
 
@@ -50,4 +52,6 @@ admin.site.register([
     InternalRegulation, DisciplinaryAction, KPI, PerformanceReview, TrainingCourse, EmployeeTraining,
     EmployeeAuditEvent, PositionAssignment, AdvancePolicy, EmployeeAdvance, CustodyAssignment,
     EmployeeContract, EmployeeWarning, EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
+    OfferLetter, EmployeeDependent, EmployeeMedicalBenefit, EmployeeHousingAssignment,
+    EmployeeChildcareBenefit, EmployeeBenefitEnrollment,
 ])
