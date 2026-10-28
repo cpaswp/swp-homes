@@ -1,0 +1,19 @@
+{% extends "hr/base.html" %}
+{% block title %}اللائحة والامتثال ومصوغات التعيين{% endblock %}
+{% block heading %}اللائحة والامتثال ومصوغات التعيين{% endblock %}
+{% block content %}
+<section class="panel device-settings-panel">
+<div class="panel-heading"><div><h2>قواعد لائحة الشركة والقانون</h2><p>سجل القواعد المسموح بها والمحظورات والحدود والعمليات التي تتطلب اعتمادًا، مع توثيق المصدر وفترة السريان.</p></div><a class="primary-button" href="/admin/hr/regulationrule/">إدارة القواعد</a></div>
+<div class="table-wrap"><table><thead><tr><th>الكود</th><th>القاعدة</th><th>النوع</th><th>النطاق</th><th>المصدر</th><th>المرجع</th><th>السريان</th><th>الحد</th><th>اعتماد</th></tr></thead><tbody>
+{% for rule in rules %}<tr><td>{{ rule.code }}</td><td>{{ rule.title }}<br><small>{{ rule.description|truncatechars:140 }}</small></td><td>{{ rule.get_rule_type_display }}</td><td>{{ rule.scope }}</td><td>{{ rule.get_source_type_display }}</td><td>{{ rule.source_reference|default:"—" }}</td><td>{{ rule.effective_from }} – {{ rule.effective_to|default:"مفتوح" }}</td><td>{% if rule.limit_value != None %}{{ rule.limit_value }} {{ rule.limit_unit }}{% else %}—{% endif %}</td><td>{{ rule.requires_approval|yesno:"نعم,لا" }}</td></tr>{% empty %}<tr><td colspan="9">لا توجد قواعد مضافة بعد. أضف قواعد الشركة والقواعد القانونية بعد مراجعة مختص.</td></tr>{% endfor %}
+</tbody></table></div>
+</section>
+<section class="panel device-settings-panel">
+<div class="panel-heading"><div><h2>مصوغات التعيين المطلوبة</h2><p>تعريف قائمة المستندات القياسية، إلزاميتها، مهلة تقديمها، اشتراط الأصل، وتواريخ الصلاحية والتنبيه قبل الانتهاء.</p></div><a class="primary-button" href="/admin/hr/hiringdocumenttemplate/">إدارة المصوغات</a></div>
+<div class="table-wrap"><table><thead><tr><th>الكود</th><th>المصوغ</th><th>التصنيف</th><th>الإلزام</th><th>ينطبق على</th><th>مهلة التسليم</th><th>الصلاحية</th><th>تنبيه قبل الانتهاء</th><th>الأصل</th></tr></thead><tbody>
+{% for item in document_templates %}<tr><td>{{ item.code }}</td><td>{{ item.title }}<br><small>{{ item.description|truncatechars:100 }}</small></td><td>{{ item.get_category_display }}</td><td>{{ item.mandatory|yesno:"إلزامي,اختياري" }}</td><td>{{ item.applies_to }}</td><td>{{ item.due_days_after_hire }} يوم</td><td>{% if item.has_expiry %}{{ item.default_validity_months|default:"حسب المستند" }} شهر{% else %}لا تنتهي / غير محددة{% endif %}</td><td>{{ item.alert_days_before_expiry }} يوم</td><td>{{ item.requires_original|yesno:"نعم,لا" }}</td></tr>{% empty %}<tr><td colspan="9">لم تتم تهيئة قائمة مصوغات التعيين. أضف المصوغات المعتمدة للشركة.</td></tr>{% endfor %}
+</tbody></table></div>
+</section>
+<section class="panel"><h2>العهد العينية</h2><p>سجل الأصول والعهد والتسليم والرد موجود في وحدة العهد الحالية. يمكن إدارة سجل العهد من لوحة الإدارة.</p><a class="primary-button" href="/admin/hr/custodyasset/">سجل العهد والأصول</a> <a class="secondary-button" href="/admin/hr/custodyassignment/">تسليم ورد العهد</a></section>
+<div class="notice notice-info"><strong>حدود التطبيق الحالي:</strong> هذه الشاشة تعرض السجلات المعرفة وتوفر إدارتها. لا تعتبر القواعد محرك منع آليًا لكل العمليات حتى تُربط بنقاط تنفيذ الإجازات والخصومات والجزاءات والعهد والمرتبات، ولا تنشئ تعريفات المصوغات تلقائيًا متطلبات لكل موظف في هذه المرحلة. لا تُعتمد أي قاعدة قانونية قبل مراجعة نص القانون والقرارات السارية وتحديد تاريخ النفاذ.</div>
+{% endblock %}

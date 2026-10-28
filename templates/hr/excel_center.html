@@ -1,0 +1,19 @@
+{% extends "hr/base.html" %}
+{% block title %}{% if request.LANGUAGE_CODE == 'en' %}Excel Import & Export{% else %}مركز استيراد وتصدير Excel{% endif %}{% endblock %}
+{% block heading %}{% if request.LANGUAGE_CODE == 'en' %}Data Center: Excel Import & Export{% else %}مركز البيانات واستيراد وتصدير Excel{% endif %}{% endblock %}
+{% block content %}
+<section class="panel device-settings-panel">
+<h2>{% if request.LANGUAGE_CODE == 'en' %}Import and Export HR Tables{% else %}استيراد وتصدير جداول الموارد البشرية{% endif %}</h2>
+<p>{% if request.LANGUAGE_CODE == 'en' %}Select a table to export its records to Excel or download a workbook as an import template. Column headers use database field names. The id column updates an existing record; leave it blank to create a new record. Any row error cancels the entire import.{% else %}اختر الجدول لتصدير جميع سجلاته إلى Excel، أو نزّل الملف أولًا ليكون قالب الاستيراد. الأعمدة تستخدم أسماء الحقول البرمجية؛ عمود id يحدّث السجل الموجود، وتركه فارغًا ينشئ سجلًا جديدًا. الاستيراد ذري: عند وجود أخطاء يتم إلغاء الملف كله.{% endif %}</p>
+<form method="get" class="excel-select-form">
+<label>{% if request.LANGUAGE_CODE == 'en' %}Table / Transaction{% else %}الجدول / الحركة{% endif %}<select name="model" id="excel-model" required><option value="">{% if request.LANGUAGE_CODE == "en" %}Select a table{% else %}اختر جدولًا{% endif %}</option>{% for item in models %}<option value="{{ item.name }}" {% if selected == item.name %}selected{% endif %}>{{ item.label }} — {{ item.name }}</option>{% endfor %}</select></label>
+<button class="primary-button" type="submit">{% if request.LANGUAGE_CODE == 'en' %}Show Table Columns{% else %}عرض أعمدة الجدول{% endif %}</button>
+</form>
+{% if selected %}
+<div class="excel-actions"><a class="primary-button" href="{% url 'hr:excel_export' selected %}">{% if request.LANGUAGE_CODE == 'en' %}Export Records to Excel{% else %}تصدير Excel للسجلات{% endif %}</a><a class="secondary-button" href="{% url 'hr:excel_export' selected %}">{% if request.LANGUAGE_CODE == 'en' %}Download Excel Template{% else %}تنزيل قالب Excel{% endif %}</a></div>
+<h3>{% if request.LANGUAGE_CODE == 'en' %}Available Import Columns{% else %}أعمدة الاستيراد المتاحة{% endif %}</h3><div class="field-chip-list">{% for f in fields %}<span>{{ f.name }} <small>{{ f.label }}</small></span>{% endfor %}</div>
+<form method="post" enctype="multipart/form-data" class="excel-import-form">{% csrf_token %}<input type="hidden" name="model" value="{{ selected }}"><label>{% if request.LANGUAGE_CODE == 'en' %}Excel workbook (.xlsx){% else %}ملف Excel بصيغة .xlsx{% endif %}<input type="file" name="workbook" accept=".xlsx" required></label><button class="primary-button" type="submit">{% if request.LANGUAGE_CODE == 'en' %}Import and Validate Data{% else %}استيراد والتحقق من البيانات{% endif %}</button></form>
+{% endif %}
+</section>
+<div class="notice notice-info"><strong>{% if request.LANGUAGE_CODE == 'en' %}Important:{% else %}ضوابط:{% endif %}</strong> {% if request.LANGUAGE_CODE == 'en' %}Excel deletion is not supported, and attachment contents are not exported. Related records may require existing reference IDs. Back up data before importing and review the results. Access is restricted to authorized administrators.{% else %}لا يدعم المركز حذف السجلات من Excel، ولا يصدّر محتوى الملفات المرفقة نفسها. قد تتطلب العلاقات أرقام السجلات المرجعية الموجودة مسبقًا. احتفظ بنسخة آمنة من البيانات قبل الاستيراد، وراجع نتائج الاستيراد. الوصول للمركز مخصص للمستخدمين المخولين من الإدارة.{% endif %}</div>
+{% endblock %}

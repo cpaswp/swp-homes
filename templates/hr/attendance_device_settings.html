@@ -1,0 +1,42 @@
+{% extends "hr/base.html" %}
+{% block title %}ضبط ماكينات الحضور{% endblock %}
+{% block heading %}ضبط ماكينات الحضور والانصراف{% endblock %}
+{% block content %}
+<section class="panel device-settings-panel">
+<h2>إعداد الجهاز</h2>
+<p>ابحث في الشركات والموديلات الشائعة، أو أدخل أي اسم يدويًا.</p>
+<label>بحث في الكتالوج <input id="catalog-search" type="search" placeholder="اسم الشركة أو الموديل"></label>
+<div id="catalog-results" class="catalog-results"></div>
+<form method="post" class="device-form">{% csrf_token %}<input type="hidden" name="device_id" id="device_id">
+<div class="form-grid">
+<label>اسم تعريفي<input name="name" required placeholder="ماكينة المدخل الرئيسي"></label>
+<label>الشركة المصنعة<input name="manufacturer" id="manufacturer" list="manufacturers" required><datalist id="manufacturers">{% for item in catalog %}<option value="{{ item.manufacturer }}">{% endfor %}</datalist></label>
+<label>الموديل<input name="model_name" id="model_name" list="models" required><datalist id="models"></datalist></label>
+<label>طريقة الاتصال<select name="connection_type">{% for value,label in connection_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+<label>عنوان IP<input name="ip_address" placeholder="192.168.1.201"></label>
+<label>المنفذ<input name="port" type="number" min="1" max="65535"></label>
+<label>الفرع / الموقع<input name="site_name"></label>
+<label>البروتوكول أو البرنامج الوسيط<input name="protocol_or_software" placeholder="SDK / API"></label>
+<label>معرف الجهاز الخارجي<input name="external_device_id"></label>
+<label class="device-enabled"><input type="checkbox" name="enabled"> مطلوب تفعيله بعد اختبار الموصل</label>
+<label class="full-row">ملاحظات<textarea name="notes" rows="3"></textarea></label>
+</div><button type="submit" class="primary-button">حفظ الإعدادات</button><button type="reset" id="reset-form" class="secondary-button">تفريغ</button>
+</form>
+</section>
+<section class="panel"><h2>الأجهزة المسجلة</h2>
+{% if devices %}<div class="table-wrap"><table><thead><tr><th>الجهاز</th><th>الشركة</th><th>الموديل</th><th>الاتصال</th><th>IP</th><th>الفرع</th><th>التفعيل</th><th></th></tr></thead><tbody>
+{% for d in devices %}<tr><td>{{ d.name }}</td><td>{{ d.manufacturer }}</td><td>{{ d.model_name }}</td><td>{{ d.get_connection_type_display }}</td><td>{{ d.ip_address|default:"—" }}</td><td>{{ d.site_name|default:"—" }}</td><td>{{ d.enabled|yesno:"مطلوب,لا" }}</td><td><button type="button" class="secondary-button edit-device" data-id="{{ d.id }}" data-name="{{ d.name|escape }}" data-manufacturer="{{ d.manufacturer|escape }}" data-model="{{ d.model_name|escape }}" data-connection="{{ d.connection_type }}" data-ip="{{ d.ip_address|default:'' }}" data-port="{{ d.port|default:'' }}" data-site="{{ d.site_name|escape }}" data-protocol="{{ d.protocol_or_software|escape }}" data-external="{{ d.external_device_id|escape }}" data-enabled="{{ d.enabled|yesno:'1,0' }}" data-notes="{{ d.notes|escape }}">تعديل</button></td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p>لا توجد أجهزة مسجلة.</p>{% endif %}</section>
+<div class="notice notice-info">القائمة المدمجة ليست كتالوجًا عالميًا كاملًا. يمكن إدخال أي شركة أو موديل يدويًا. حفظ الإعدادات لا يعني أن المزامنة الفعلية تعمل؛ يلزم موصل مطابق لبروتوكول الجهاز واختباره. لا تضع كلمات مرور في الملاحظات.</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const catalog = {{ catalog|safe }};
+const maker=document.getElementById("manufacturer"), model=document.getElementById("model_name"), models=document.getElementById("models"), search=document.getElementById("catalog-search"), results=document.getElementById("catalog-results");
+function refreshModels(){models.innerHTML="";const entry=catalog.find(x=>x.manufacturer.toLowerCase()===maker.value.trim().toLowerCase());if(entry)entry.models.forEach(x=>{const o=document.createElement("option");o.value=x;models.appendChild(o);});}
+maker.addEventListener("input",refreshModels);
+search.addEventListener("input",()=>{results.innerHTML="";const q=search.value.trim().toLowerCase();if(!q)return;let found=[];catalog.forEach(x=>x.models.forEach(m=>{if((x.manufacturer+" "+m).toLowerCase().includes(q))found.push({manufacturer:x.manufacturer,model:m});}));catalog.filter(x=>x.manufacturer.toLowerCase().includes(q)).forEach(x=>x.models.forEach(m=>{if(!found.some(y=>y.manufacturer===x.manufacturer&&y.model===m))found.push({manufacturer:x.manufacturer,model:m});}));found.slice(0,40).forEach(x=>{const b=document.createElement("button");b.type="button";b.className="catalog-result";b.textContent=x.manufacturer+" — "+x.model;b.onclick=()=>{maker.value=x.manufacturer;refreshModels();model.value=x.model;results.innerHTML="";};results.appendChild(b);});if(!found.length)results.textContent="لا توجد مطابقة؛ أدخل الاسم يدويًا.";});
+document.querySelectorAll(".edit-device").forEach(b=>b.addEventListener("click",()=>{const d=b.dataset,f=document.querySelector(".device-form");f.elements.device_id.value=d.id;f.elements.name.value=d.name;maker.value=d.manufacturer;refreshModels();model.value=d.model;f.elements.connection_type.value=d.connection;f.elements.ip_address.value=d.ip;f.elements.port.value=d.port;f.elements.site_name.value=d.site;f.elements.protocol_or_software.value=d.protocol;f.elements.external_device_id.value=d.external;f.elements.enabled.checked=d.enabled==="1";f.elements.notes.value=d.notes;f.scrollIntoView({behavior:"smooth"});}));
+document.getElementById("reset-form").addEventListener("click",()=>setTimeout(()=>document.getElementById("device_id").value="",0));
+</script>
+{% endblock %}

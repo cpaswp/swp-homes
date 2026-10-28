@@ -1,0 +1,62 @@
+{% extends "hr/base.html" %}
+{% block title %}التقارير الإدارية | SWP People{% endblock %}
+{% block heading %}التقارير الإدارية والتحليلية{% endblock %}
+{% block content %}
+<section class="welcome"><div><span class="eyebrow light">WORKFORCE · PAYROLL · CONTROL</span><h2>صورة موحدة للقوى العاملة والتكلفة والمخاطر</h2><p>تُحسب المؤشرات من سجلات الموظفين والمرتبات والمستندات والسلف والعهد المسجلة بالنظام.</p></div><div class="welcome-icon">▥</div></section>
+<section class="stats">
+  <article class="stat"><span>الموظفون على رأس العمل</span><strong>{{ active_employee_count }}</strong><small>موظف نشط</small></article>
+  <article class="stat"><span>الإدارات النشطة</span><strong>{{ department_count }}</strong><small>إدارة</small></article>
+  <article class="stat"><span>متطلبات متأخرة</span><strong>{{ overdue_requirements }}</strong><small>مطلوب تجاوز موعده</small></article>
+  <article class="stat"><span>مستندات منتهية</span><strong>{{ expired_documents }}</strong><small>تحتاج مراجعة</small></article>
+  <article class="stat"><span>رصيد السلف القائمة</span><strong>{{ advance_outstanding|floatformat:2 }}</strong><small>ج.م · {{ active_advance_count }} سلفة قائمة</small></article>
+  <article class="stat"><span>عهد مؤمّنة ستنتهي قريبًا</span><strong>{{ expiring_assets }}</strong><small>خلال 30 يومًا</small></article>
+</section>
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>تكلفة المرتبات حسب الإدارة</h3><p>للفترة المختارة فقط؛ لا تُخلط الفترات ولا تُحسب الرواتب الأساسية خارج كشف المرتب.</p></div></div>
+  <form method="get" class="report-filters">
+    <label>فترة المرتبات <select name="period">{% for p in periods %}<option value="{{ p.pk }}" {% if selected_period.pk == p.pk %}selected{% endif %}>{{ p.name }} ({{ p.start_date }} – {{ p.end_date }})</option>{% endfor %}</select></label>
+    <label>سنة خطة العمالة <input name="year" type="number" min="2000" max="2100" value="{{ year }}"></label>
+    <button type="submit">تحديث التقرير</button>
+  </form>
+  {% if selected_period %}
+  <div class="table-wrap"><table><thead><tr><th>الإدارة</th><th>عدد الموظفين</th><th>الأساسي</th><th>البدلات</th><th>الإضافي</th><th>الاستقطاعات</th><th>الضرائب والتأمينات</th><th>صافي المرتب</th></tr></thead><tbody>
+  {% for r in payroll_rows %}<tr><td>{{ r.employee__department__name|default:"غير محدد" }}</td><td>{{ r.employee_count }}</td><td>{{ r.basic|floatformat:2 }}</td><td>{{ r.allowances|floatformat:2 }}</td><td>{{ r.overtime|floatformat:2 }}</td><td>{{ r.deductions|floatformat:2 }}</td><td>{{ r.tax_and_insurance|floatformat:2 }}</td><td><b>{{ r.net|floatformat:2 }}</b></td></tr>{% empty %}<tr><td colspan="8" class="empty">لا توجد بنود مرتبات في هذه الفترة.</td></tr>{% endfor %}
+  <tr><th>إجمالي الشركة</th><th>—</th><th>{{ payroll_totals.basic|floatformat:2 }}</th><th>{{ payroll_totals.allowances|floatformat:2 }}</th><th>{{ payroll_totals.overtime|floatformat:2 }}</th><th>{{ payroll_totals.deductions|floatformat:2 }}</th><th>{{ payroll_totals.tax_and_insurance|floatformat:2 }}</th><th>{{ payroll_totals.net|floatformat:2 }}</th></tr>
+  </tbody></table></div>
+  {% else %}<p class="empty">أنشئ فترة مرتبات لعرض التقرير المالي.</p>{% endif %}
+</section>
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>خطة العمالة مقابل العدد الفعلي</h3><p>تظهر الخطة المعتمدة عند إدخالها لكل إدارة وسنة مالية.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>الإدارة</th><th>العدد الفعلي</th><th>العدد المعتمد</th><th>الحد الأدنى</th><th>الحد الأقصى</th><th>موازنة المرتبات الشهرية</th><th>موازنة المرتبات السنوية</th><th>الانحراف عن المعتمد</th></tr></thead><tbody>
+  {% for d in headcount_by_department %}<tr><td>{{ d.name }}</td><td>{{ d.active_count }}</td>{% if d.workforce_plan %}<td>{{ d.workforce_plan.approved_headcount }}</td><td>{{ d.workforce_plan.minimum_headcount }}</td><td>{{ d.workforce_plan.maximum_headcount }}</td><td>{{ d.workforce_plan.approved_monthly_payroll_budget|floatformat:2 }}</td><td>{{ d.workforce_plan.approved_annual_payroll_budget|floatformat:2 }}</td><td>{% if d.headcount_variance > 0 %}<span class="status warning">زيادة {{ d.headcount_variance }}</span>{% elif d.headcount_variance < 0 %}<span class="status active">أقل من الخطة {{ d.headcount_variance|stringformat:"+d" }}</span>{% else %}<span class="status active">مطابق</span>{% endif %}</td>{% else %}<td colspan="6"><span class="status">لم تُسجل خطة {{ year }}</span></td>{% endif %}</tr>{% empty %}<tr><td colspan="8" class="empty">لا توجد إدارات نشطة.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+<section class="stats" style="margin-top:22px">
+  <article class="stat"><span>متطلبات ناقصة/مرفوضة</span><strong>{{ missing_documents }}</strong><small>متابعة ملف الموظف</small></article>
+  <article class="stat"><span>عهد مسلمة بلا تأمين مسجل</span><strong>{{ uninsured_assigned_assets }}</strong><small>مراجعة حسب سياسة المخاطر</small></article>
+  <article class="stat"><span>التسكينات/التكليفات السارية</span><strong>{{ current_assignments_count }}</strong><small>سجلات سارية بالتاريخ الحالي</small></article>
+  <article class="stat"><span>شواغر وفق خطط الإدارات</span><strong>{{ planned_vacancies }}</strong><small>مجموع الفرق الإيجابية بين الخطة والعدد الفعلي</small></article>
+</section>
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>البدلات والمكافآت والاستقطاعات المعتمدة غير المرحلة</h3><p>قائمة رقابية لمنع نسيان أي بند قبل إقفال المرتب. هذه البنود لم تُربط بعد بسطر مرتب، لذلك لا تدخل في صافي المرتب المعروض أعلاه.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>الإدارة</th><th>نوع البند</th><th>عدد البنود</th><th>إجمالي القيمة</th></tr></thead><tbody>
+  {% for item in compensation_pending_rows %}<tr><td>{{ item.employee__department__name|default:"غير محدد" }}</td><td>{{ item.kind }}</td><td>{{ item.item_count }}</td><td>{{ item.amount_total|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="empty">لا توجد بنود معتمدة غير مرحلة لهذه الفترة.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="payroll-total"><small>إجمالي البنود المعتمدة التي تحتاج ترحيلًا أو مراجعة قبل إقفال الفترة</small><strong>{{ compensation_pending_total|floatformat:2 }} ج.م</strong></div>
+</section>
+<section class="stats" style="margin-top:22px">
+  <article class="stat"><span>عقود تنتهي خلال 60 يومًا</span><strong>{{ contracts_expiring }}</strong><small>تحتاج قرار تجديد أو إنهاء</small></article>
+  <article class="stat"><span>عقود انتهت وتحتاج مراجعة</span><strong>{{ contracts_expired }}</strong><small>الحالة ما زالت سارية بالنظام</small></article>
+  <article class="stat"><span>إنذارات مفتوحة</span><strong>{{ open_warnings }}</strong><small>قيد المراجعة أو صادرة</small></article>
+</section>
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>مؤشرات المستهدفات — الكمية والقيمة والموازنة</h3><p>لا يُحتسب الإنجاز إلا من سجلات إنجاز تم التحقق منها؛ يُعرض الإنجاز الكمي والقيمي منفصلين عن استهلاك التكلفة.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>الإدارة</th><th>المستهدف</th><th>المسؤول</th><th>كمية مستهدفة</th><th>كمية منجزة</th><th>إنجاز الكمية</th><th>قيمة مستهدفة</th><th>قيمة منجزة</th><th>إنجاز القيمة</th><th>الموازنة</th><th>التكلفة الفعلية</th><th>استهلاك الموازنة</th></tr></thead><tbody>
+  {% for target in target_rows %}
+  <tr><td>{{ target.department.name }}</td><td><b>{{ target.name }}</b><small class="subline">{{ target.code }} · {{ target.get_status_display }}</small></td><td>{{ target.owner.full_name|default:"—" }}</td><td>{{ target.target_quantity|floatformat:3 }} {{ target.unit }}</td><td>{{ target.actual_quantity|floatformat:3 }}</td><td><div class="progress-track"><span style="width:{% if target.quantity_pct > 100 %}100{% else %}{{ target.quantity_pct }}{% endif %}%"></span></div><small>{{ target.quantity_pct|floatformat:1 }}%</small></td><td>{{ target.target_value|floatformat:2 }}</td><td>{{ target.actual_value|floatformat:2 }}</td><td><div class="progress-track"><span style="width:{% if target.value_pct > 100 %}100{% else %}{{ target.value_pct }}{% endif %}%"></span></div><small>{{ target.value_pct|floatformat:1 }}%</small></td><td>{{ target.budget_amount|floatformat:2 }}</td><td>{{ target.actual_cost|floatformat:2 }}</td><td><div class="progress-track"><span style="width:{% if target.budget_used_pct > 100 %}100{% else %}{{ target.budget_used_pct }}{% endif %}%"></span></div><small>{{ target.budget_used_pct|floatformat:1 }}%</small></td></tr>
+  {% empty %}<tr><td colspan="12" class="empty">لا توجد مستهدفات مسجلة لهذه السنة. أضف المستهدفات وموازناتها ثم سجّل الإنجاز الدوري المعتمد.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="payroll-total"><small>ملخص الشركة — إنجاز الكمية {{ target_totals.quantity_pct|floatformat:1 }}% · إنجاز القيمة {{ target_totals.value_pct|floatformat:1 }}% · استهلاك الموازنة {{ target_totals.budget_used_pct|floatformat:1 }}%</small><strong>الموازنة {{ target_totals.budget_amount|floatformat:2 }} ج.م | التكلفة {{ target_totals.actual_cost|floatformat:2 }} ج.م</strong></div>
+</section>
+<p class="notice" style="margin-top:18px">تنبيه: المؤشرات تعكس البيانات المسجلة حاليًا. لا يُعد هذا التقرير اعتمادًا ماليًا، ولا يحسب تكلفة صاحب العمل التأمينية منفصلة ما لم تُسجل ضمن عناصر التكلفة؛ كما أن وجود نموذج بيانات لا يعني أن كل إجراءات الاعتماد أو الخصم الآلي قد اكتملت.</p>
+{% endblock %}

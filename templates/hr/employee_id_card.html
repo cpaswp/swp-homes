@@ -1,0 +1,61 @@
+{% extends "hr/base.html" %}
+{% block title %}طباعة بطاقة الموظف{% endblock %}
+{% block heading %}طباعة بطاقة الموظف{% endblock %}
+{% block content %}
+<section class="toolbar no-print">
+  <div><h2>بطاقة تعريف الموظف</h2><p>بطاقة أمامية وخلفية بمقاس البطاقات القياسي CR80 ‏(85.6 × 54 مم).</p></div>
+  <button type="button" onclick="window.print()">طباعة البطاقة</button>
+</section>
+<div class="id-card-print-area">
+  <section class="employee-id-card id-card-front" aria-label="الوجه الأمامي للبطاقة">
+    <header class="id-card-header">
+      {% if company and company.logo %}<img src="{{ company.logo.url }}" alt="شعار الشركة" class="id-company-logo">{% else %}<span class="id-company-mark">{{ company.name|slice:":1"|default:"ش" }}</span>{% endif %}
+      <div class="id-company-title"><strong>{{ company.name|default:"اسم الشركة" }}</strong><small>بطاقة تعريف موظف</small></div>
+    </header>
+    <div class="id-card-main">
+      <div class="id-avatar">{{ employee.full_name|slice:":1" }}</div>
+      <div class="id-employee-details">
+        <h2>{{ employee.full_name }}</h2>
+        <p>{{ employee.position.title|default:"المسمى الوظيفي غير محدد" }}</p>
+        <div class="id-number"><span>رقم الموظف</span><strong>{{ employee.employee_code }}</strong></div>
+        <small>{{ employee.department.name|default:"" }}</small>
+      </div>
+    </div>
+    <footer class="id-card-footer"><span>SWP PEOPLE</span><span>تاريخ الإصدار: {{ today|date:"Y/m/d" }}</span></footer>
+    <svg id="employee-barcode" class="employee-barcode" role="img" aria-label="باركود رقم الموظف"></svg>
+  </section>
+  <section class="employee-id-card id-card-back" aria-label="الوجه الخلفي للبطاقة">
+    <header class="id-back-header"><strong>{{ company.name|default:"بيانات الشركة" }}</strong><span>بيانات التواصل</span></header>
+    <div class="id-back-note"><b>ملاحظة</b><p>{{ company.employee_card_note|default:"هذه البطاقة شخصية ويجب إعادتها إلى الشركة عند انتهاء الخدمة." }}</p></div>
+    <div class="id-company-contact">
+      <p><b>العنوان</b><span>{{ company.address|default:"—" }}</span></p>
+      <p><b>البريد الإلكتروني</b><span>{{ company.email|default:"—" }}</span></p>
+      <p><b>الموقع الإلكتروني</b><span>{{ company.website|default:"—" }}</span></p>
+      <p><b>التليفون</b><span>{{ company.phone|default:"—" }}</span></p>
+    </div>
+    <div class="id-validity"><span>البطاقة سارية حتى</span><strong>{% if valid_until %}{{ valid_until|date:"Y/m/d" }}{% else %}وفق سجل صلاحية البطاقة{% endif %}</strong></div>
+    <footer class="id-card-footer"><span>يرجى إعادة البطاقة عند العثور عليها</span><span>{{ employee.employee_code }}</span></footer>
+  </section>
+</div>
+<p class="print-help no-print">لأفضل نتيجة: اختر طباعة بالحجم الفعلي (100%)، وأوقف رؤوس وتذييلات المتصفح. للطباعة على الوجهين، استخدم قلب الورق على الحافة القصيرة حسب إعدادات ماكينة الطباعة.</p>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+(function () {
+  const svg = document.getElementById("employee-barcode");
+  if (!svg) return;
+  function draw() {
+    if (window.JsBarcode) {
+      window.JsBarcode(svg, "{{ employee.employee_code|escapejs }}", {
+        format: "CODE128", displayValue: true, font: "monospace",
+        fontSize: 10, height: 27, margin: 0, width: 1.5,
+        background: "#ffffff", lineColor: "#142b4a"
+      });
+    }
+  }
+  draw();
+  window.addEventListener("beforeprint", draw);
+})();
+</script>
+{% endblock %}

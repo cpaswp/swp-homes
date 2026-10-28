@@ -1,0 +1,88 @@
+{% extends "hr/base.html" %}
+{% block title %}{% if english %}Talent & Skills{% else %}المواهب والمهارات{% endif %} | SWP HRMS{% endblock %}
+{% block heading %}{% if english %}Talent intelligence{% else %}ذكاء المواهب وتخطيط المهارات{% endif %}{% endblock %}
+{% block content %}
+<section class="welcome">
+  <div>
+    <span class="eyebrow light">TALENT · SKILLS · SUCCESSION</span>
+    <h2>{% if english %}Build skills, grow careers, protect critical roles{% else %}طوّر المهارات والمسارات المهنية وجهّز بدائل الوظائف الحرجة{% endif %}</h2>
+    <p>{% if english %}An HR-only workspace for skill assessments, development plans and succession readiness. All entries remain subject to HR access controls.{% else %}مساحة موارد بشرية لتقييم المهارات وخطط التطوير والتعاقب الوظيفي، وتخضع بياناتها لصلاحيات الموارد البشرية.{% endif %}</p>
+  </div>
+  <div class="welcome-icon">✦</div>
+</section>
+
+<section class="stats">
+  <article class="stat"><span>{% if english %}Active skills{% else %}المهارات النشطة{% endif %}</span><strong>{{ skill_count }}</strong></article>
+  <article class="stat"><span>{% if english %}Skill assessments{% else %}تقييمات المهارات{% endif %}</span><strong>{{ assessment_count }}</strong></article>
+  <article class="stat"><span>{% if english %}Active development plans{% else %}خطط التطوير النشطة{% endif %}</span><strong>{{ active_development_count }}</strong></article>
+  <article class="stat"><span>{% if english %}Critical roles with successors{% else %}وظائف لها بدلاء مسجلون{% endif %}</span><strong>{{ critical_positions_covered }}</strong></article>
+</section>
+
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>{% if english %}Add a skill{% else %}إضافة مهارة{% endif %}</h3><p>{% if english %}Maintain a reusable skills catalogue.{% else %}إنشاء قاموس موحد للمهارات القابلة لإعادة الاستخدام.{% endif %}</p></div></div>
+  <form method="post" class="report-filters">{% csrf_token %}<input type="hidden" name="action" value="skill">
+    <label>{% if english %}Skill name{% else %}اسم المهارة{% endif %}<input name="name" maxlength="160" required></label>
+    <label>{% if english %}Category{% else %}التصنيف{% endif %}<input name="category" maxlength="80"></label>
+    <label>{% if english %}Description{% else %}الوصف{% endif %}<input name="description"></label>
+    <button type="submit">{% if english %}Save skill{% else %}حفظ المهارة{% endif %}</button>
+  </form>
+</section>
+
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>{% if english %}Assess employee skill{% else %}تقييم مهارة موظف{% endif %}</h3><p>{% if english %}Level 1–5. Evidence and next review date help keep assessments traceable.{% else %}مستوى من 1 إلى 5، مع توثيق الأدلة وتاريخ المراجعة التالية.{% endif %}</p></div></div>
+  <form method="post" class="report-filters">{% csrf_token %}<input type="hidden" name="action" value="assessment">
+    <label>{% if english %}Employee{% else %}الموظف{% endif %}<select name="employee" required><option value="">—</option>{% for employee in employees %}<option value="{{ employee.pk }}">{{ employee.employee_code }} — {{ employee.full_name }}</option>{% endfor %}</select></label>
+    <label>{% if english %}Skill{% else %}المهارة{% endif %}<select name="skill" required><option value="">—</option>{% for skill in skills %}<option value="{{ skill.pk }}">{{ skill.name }}{% if skill.category %} · {{ skill.category }}{% endif %}</option>{% endfor %}</select></label>
+    <label>{% if english %}Level{% else %}المستوى{% endif %}<select name="level" required><option value="1">1 — {% if english %}Beginner{% else %}مبتدئ{% endif %}</option><option value="2">2 — {% if english %}Basic{% else %}أساسي{% endif %}</option><option value="3">3 — {% if english %}Intermediate{% else %}متوسط{% endif %}</option><option value="4">4 — {% if english %}Advanced{% else %}متقدم{% endif %}</option><option value="5">5 — {% if english %}Expert{% else %}خبير{% endif %}</option></select></label>
+    <label>{% if english %}Next review{% else %}المراجعة التالية{% endif %}<input type="date" name="next_review_date"></label>
+    <label>{% if english %}Evidence / notes{% else %}الأدلة والملاحظات{% endif %}<input name="evidence"></label>
+    <button type="submit">{% if english %}Save assessment{% else %}حفظ التقييم{% endif %}</button>
+  </form>
+</section>
+
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>{% if english %}Career development plan{% else %}خطة تطوير وظيفي{% endif %}</h3></div></div>
+  <form method="post" class="report-filters">{% csrf_token %}<input type="hidden" name="action" value="development">
+    <label>{% if english %}Employee{% else %}الموظف{% endif %}<select name="employee" required><option value="">—</option>{% for employee in employees %}<option value="{{ employee.pk }}">{{ employee.employee_code }} — {{ employee.full_name }}</option>{% endfor %}</select></label>
+    <label>{% if english %}Plan title{% else %}عنوان الخطة{% endif %}<input name="title" maxlength="180" required></label>
+    <label>{% if english %}Development objective{% else %}الهدف التطويري{% endif %}<input name="objective" required></label>
+    <label>{% if english %}Actions{% else %}خطوات التطوير{% endif %}<input name="actions"></label>
+    <label>{% if english %}Start date{% else %}تاريخ البداية{% endif %}<input type="date" name="start_date"></label>
+    <label>{% if english %}Target date{% else %}التاريخ المستهدف{% endif %}<input type="date" name="target_date"></label>
+    <button type="submit">{% if english %}Create plan{% else %}إنشاء الخطة{% endif %}</button>
+  </form>
+</section>
+
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>{% if english %}Succession candidate{% else %}مرشح للتعاقب الوظيفي{% endif %}</h3><p>{% if english %}Succession planning is a confidential HR decision aid, not an automatic promotion decision.{% else %}التعاقب الوظيفي أداة تخطيط سرية، وليس قرار ترقية تلقائياً.{% endif %}</p></div></div>
+  <form method="post" class="report-filters">{% csrf_token %}<input type="hidden" name="action" value="succession">
+    <label>{% if english %}Critical position{% else %}الوظيفة الحرجة{% endif %}<select name="position" required><option value="">—</option>{% for position in positions %}<option value="{{ position.pk }}">{{ position.title }} — {{ position.department.name }}</option>{% endfor %}</select></label>
+    <label>{% if english %}Nominee{% else %}المرشح البديل{% endif %}<select name="nominee" required><option value="">—</option>{% for employee in employees %}<option value="{{ employee.pk }}">{{ employee.employee_code }} — {{ employee.full_name }}</option>{% endfor %}</select></label>
+    <label>{% if english %}Readiness{% else %}الجاهزية{% endif %}<select name="readiness">{% for value,label in readiness_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+    <label>{% if english %}Development needs{% else %}احتياجات التطوير{% endif %}<input name="development_needs"></label>
+    <label>{% if english %}Risk notes{% else %}ملاحظات المخاطر{% endif %}<input name="risk_notes"></label>
+    <button type="submit">{% if english %}Save succession plan{% else %}حفظ خطة التعاقب{% endif %}</button>
+  </form>
+</section>
+
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>{% if english %}Latest skill assessments{% else %}أحدث تقييمات المهارات{% endif %}</h3></div></div>
+  <div class="table-wrap"><table><thead><tr><th>{% if english %}Employee{% else %}الموظف{% endif %}</th><th>{% if english %}Skill{% else %}المهارة{% endif %}</th><th>{% if english %}Level{% else %}المستوى{% endif %}</th><th>{% if english %}Assessed on{% else %}تاريخ التقييم{% endif %}</th><th>{% if english %}Next review{% else %}المراجعة التالية{% endif %}</th></tr></thead><tbody>
+  {% for row in assessments %}<tr><td>{{ row.employee.full_name }}</td><td>{{ row.skill.name }}</td><td>{{ row.level }}/5</td><td>{{ row.assessed_at }}</td><td>{{ row.next_review_date|default:"—" }}</td></tr>{% empty %}<tr><td colspan="5">{% if english %}No assessments recorded yet.{% else %}لا توجد تقييمات مسجلة بعد.{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>{% if english %}Development plans{% else %}خطط التطوير الوظيفي{% endif %}</h3></div></div>
+  <div class="table-wrap"><table><thead><tr><th>{% if english %}Employee{% else %}الموظف{% endif %}</th><th>{% if english %}Plan{% else %}الخطة{% endif %}</th><th>{% if english %}Status{% else %}الحالة{% endif %}</th><th>{% if english %}Progress{% else %}الإنجاز{% endif %}</th><th>{% if english %}Target date{% else %}التاريخ المستهدف{% endif %}</th></tr></thead><tbody>
+  {% for row in development_plans %}<tr><td>{{ row.employee.full_name }}</td><td>{{ row.title }}</td><td>{{ row.status_label }}</td><td>{{ row.progress_percent }}%</td><td>{{ row.target_date|default:"—" }}</td></tr>{% empty %}<tr><td colspan="5">{% if english %}No plans recorded yet.{% else %}لا توجد خطط مسجلة بعد.{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>{% if english %}Succession coverage{% else %}تغطية التعاقب الوظيفي{% endif %}</h3></div></div>
+  <div class="table-wrap"><table><thead><tr><th>{% if english %}Position{% else %}الوظيفة{% endif %}</th><th>{% if english %}Nominee{% else %}المرشح{% endif %}</th><th>{% if english %}Readiness{% else %}الجاهزية{% endif %}</th><th>{% if english %}Development needs{% else %}احتياجات التطوير{% endif %}</th></tr></thead><tbody>
+  {% for row in succession_plans %}<tr><td>{{ row.position.title }}</td><td>{{ row.nominee.full_name }}</td><td>{{ row.readiness_label }}</td><td>{{ row.development_needs|default:"—" }}</td></tr>{% empty %}<tr><td colspan="4">{% if english %}No succession candidates recorded yet.{% else %}لا توجد خطط تعاقب مسجلة بعد.{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}
