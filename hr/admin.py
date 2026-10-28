@@ -49,4 +49,5 @@ admin.site.register([
     EmployeeInsuranceRecord, InsuranceFormRecord, SalaryChange, PayrollComponent, EmployeeDeduction,
     InternalRegulation, DisciplinaryAction, KPI, PerformanceReview, TrainingCourse, EmployeeTraining,
     EmployeeAuditEvent, PositionAssignment, AdvancePolicy, EmployeeAdvance, CustodyAssignment,
+    EmployeeContract, EmployeeWarning, EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
 ])
