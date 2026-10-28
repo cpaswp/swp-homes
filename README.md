@@ -59,3 +59,6 @@ See `PHASE5_REPORTS_STATUS_AR.md`. Reports are derived from posted journals and 
 - Smoke tests added in `hr/tests.py`.
 - Implementation boundaries and phased delivery requirements: `HRMS_ROADMAP_AR.md`.
 - This foundation does not yet implement face verification, server-enforced 50m geofencing, live approval decisions, payroll calculations, central tenant database selection, or admin email OTP. Do not enable it for production payroll/attendance until those workflows and security tests are completed.
+
+## GitHub + Neon deployment setup
+- See `NEON_GITHUB_SETUP_AR.md` for the guarded manual Neon migration workflow, required GitHub secrets, and deployment limitations.
