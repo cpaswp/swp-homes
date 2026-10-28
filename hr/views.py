@@ -1,10 +1,10 @@
 import json
 from decimal import Decimal
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.db.models import Sum
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_GET
+from django.utils import timezone
 from .models import Employee, Department, AttendanceRecord, LeaveRequest, ApprovalRequest, PayrollPeriod, PayrollItem
 
 
@@ -14,21 +14,22 @@ def dashboard(request):
     context = {
         "employee_count": active.count(),
         "department_count": Department.objects.filter(is_active=True).count(),
-        "today_attendance": AttendanceRecord.objects.filter(recorded_at__date=__import__("django").utils.timezone.localdate()).count(),
+        "today_attendance": AttendanceRecord.objects.filter(recorded_at__date=timezone.localdate()).count(),
         "pending_leaves": LeaveRequest.objects.filter(status=LeaveRequest.Status.PENDING).count(),
         "pending_approvals": ApprovalRequest.objects.filter(status=ApprovalRequest.Status.PENDING).count(),
         "latest_employees": active.select_related("department", "position").order_by("-created_at")[:8],
-        "payroll_totals": PayrollItem.objects.filter(period__status__in=["review","approved","paid"]).aggregate(total=Sum("net_salary"))["total"] or Decimal("0.00"),
+        "payroll_totals": PayrollItem.objects.filter(period__status__in=["review", "approved", "paid"]).aggregate(total=Sum("net_salary"))["total"] or Decimal("0.00"),
     }
     return render(request, "hr/dashboard.html", context)
 
 
 @login_required
 def employee_list(request):
-    employees = Employee.objects.select_related("department", "position", "manager").all()
     query = request.GET.get("q", "").strip()
+    employees = Employee.objects.select_related("department", "position", "manager").all()
     if query:
-        employees = employees.filter(full_name__icontains=query) | employees.filter(employee_code__icontains=query)
+        from django.db.models import Q
+        employees = employees.filter(Q(full_name__icontains=query) | Q(employee_code__icontains=query))
     return render(request, "hr/employee_list.html", {"employees": employees[:500], "query": query})
 
 
