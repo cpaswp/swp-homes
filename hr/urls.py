@@ -6,7 +6,7 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("employees/", views.employee_list, name="employees"),
     path("recruitment/interviews/", views.recruitment_interviews, name="recruitment_interviews"),
-    path("talent/", views.talent_center, name="talent_center"),
+    path("talent/", views.talent_center, name="talent_center"),\n    path("employee-excellence/", views.employee_excellence_dashboard, name="employee_excellence_dashboard"),\n    path("employee-fund/", views.employee_fund_center, name="employee_fund_center"),
     path("settings/attendance-devices/", views.attendance_device_settings, name="attendance_device_settings"),
     path("settings/compliance/", views.compliance_settings, name="compliance_settings"),
     path("data/excel/", views.excel_center, name="excel_center"),
