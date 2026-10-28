@@ -1,0 +1,43 @@
+name: Neon database migration (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: "Type SWP-HOMES-NEON to confirm the target is the NEW swp-homes Neon database"
+        required: true
+        type: string
+jobs:
+  migrate:
+    if: ${{ inputs.confirm_target == 'SWP-HOMES-NEON' }}
+    runs-on: ubuntu-latest
+    environment: neon-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Validate Django configuration
+        env:
+          DJANGO_ENV: production
+          DJANGO_DEBUG: "False"
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_ALLOWED_HOSTS: localhost
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          test -n "$DATABASE_URL" || (echo "NEON_DATABASE_URL secret is missing" && exit 1)
+          test -n "$DJANGO_SECRET_KEY" || (echo "DJANGO_SECRET_KEY secret is missing" && exit 1)
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+      - name: Apply pending migrations
+        env:
+          DJANGO_ENV: production
+          DJANGO_DEBUG: "False"
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_ALLOWED_HOSTS: localhost
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: python manage.py migrate --noinput
