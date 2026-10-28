@@ -137,8 +137,6 @@ def management_reports(request):
     current_assignments = PositionAssignment.objects.filter(
         status=PositionAssignment.Status.ACTIVE, start_date__lte=today
     ).filter(Q(end_date__isnull=True) | Q(end_date__gte=today))
-    vacancies = sum(max((p.approved_headcount - (plans.get(p.department_id).approved_headcount - p.approved_headcount))
-                        if plans.get(p.department_id) else 0, 0) for p in [])  # vacancies are reported from approved plan below
     planned_vacancies = sum(max(plan.approved_headcount - active_employees.filter(department_id=plan.department_id).count(), 0)
                             for plan in plans.values())
     context = {
