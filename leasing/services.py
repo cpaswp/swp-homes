@@ -39,6 +39,10 @@ def allocate_receipt(receipt_id, allocations):
         raise ValidationError("Posted receipts cannot be changed.")
     if receipt.tenant.company_id != receipt.company_id:
         raise ValidationError("Receipt tenant belongs to another company.")
+    if receipt.amount <= 0:
+        raise ValidationError("Receipt amount must be positive.")
+    if not allocations:
+        raise ValidationError("At least one allocation is required.")
     if receipt.allocations.exists():
         raise ValidationError("Receipt already has allocations.")
     total, prepared, seen = Decimal("0.00"), [], set()
