@@ -37,6 +37,13 @@
   <article class="stat"><span>التسكينات/التكليفات السارية</span><strong>{{ current_assignments_count }}</strong><small>سجلات سارية بالتاريخ الحالي</small></article>
   <article class="stat"><span>شواغر وفق خطط الإدارات</span><strong>{{ planned_vacancies }}</strong><small>مجموع الفرق الإيجابية بين الخطة والعدد الفعلي</small></article>
 </section>
+<section class="panel" style="margin-top:22px">
+  <div class="panel-head"><div><h3>البدلات والمكافآت والاستقطاعات المعتمدة غير المرحلة</h3><p>قائمة رقابية لمنع نسيان أي بند قبل إقفال المرتب. هذه البنود لم تُربط بعد بسطر مرتب، لذلك لا تدخل في صافي المرتب المعروض أعلاه.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>الإدارة</th><th>نوع البند</th><th>عدد البنود</th><th>إجمالي القيمة</th></tr></thead><tbody>
+  {% for item in compensation_pending_rows %}<tr><td>{{ item.employee__department__name|default:"غير محدد" }}</td><td>{{ item.kind }}</td><td>{{ item.item_count }}</td><td>{{ item.amount_total|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="empty">لا توجد بنود معتمدة غير مرحلة لهذه الفترة.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="payroll-total"><small>إجمالي البنود المعتمدة التي تحتاج ترحيلًا أو مراجعة قبل إقفال الفترة</small><strong>{{ compensation_pending_total|floatformat:2 }} ج.م</strong></div>
+</section>
 <section class="stats" style="margin-top:22px">
   <article class="stat"><span>عقود تنتهي خلال 60 يومًا</span><strong>{{ contracts_expiring }}</strong><small>تحتاج قرار تجديد أو إنهاء</small></article>
   <article class="stat"><span>عقود انتهت وتحتاج مراجعة</span><strong>{{ contracts_expired }}</strong><small>الحالة ما زالت سارية بالنظام</small></article>
