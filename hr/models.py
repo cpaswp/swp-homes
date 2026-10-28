@@ -1121,3 +1121,67 @@ class RecordAttachment(models.Model):
         verbose_name_plural = "مرفقات المستندات والسجلات"
     def __str__(self):
         return f"{self.title} ({self.content_type_id}:{self.object_id})"
+
+
+
+class RecruitmentInterview(models.Model):
+    """A scheduled interview stage with independently configured scoring criteria."""
+    class Stage(models.TextChoices):
+        HR = "hr", "الموارد البشرية"
+        DEPARTMENT = "department", "مدير الإدارة"
+        EXECUTIVE = "executive", "المدير العام / صاحب الشركة"
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "مجدولة"
+        COMPLETED = "completed", "مكتملة"
+        CANCELLED = "cancelled", "ملغاة"
+    candidate = models.ForeignKey(RecruitmentCandidate, on_delete=models.CASCADE, related_name="interviews", verbose_name="المرشح")
+    stage = models.CharField("مرحلة المقابلة", max_length=20, choices=Stage.choices)
+    interviewer = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="recruitment_interviews", verbose_name="المقابل")
+    scheduled_at = models.DateTimeField("موعد المقابلة")
+    location_or_link = models.CharField("المكان أو رابط الاجتماع", max_length=300, blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.SCHEDULED)
+    notes = models.TextField("ملاحظات المقابلة", blank=True)
+    earned_score = models.DecimalField("الدرجة المحققة", max_digits=8, decimal_places=2, default=0)
+    maximum_score = models.DecimalField("إجمالي الدرجات", max_digits=8, decimal_places=2, default=0)
+    score_percent = models.DecimalField("النسبة المئوية", max_digits=5, decimal_places=2, default=0)
+    recommendation = models.CharField("التوصية", max_length=20, choices=[("pending","بانتظار التقييم"),("advance","ينتقل للمرحلة التالية"),("hold","مراجعة إضافية"),("reject","غير مناسب")], default="pending")
+    completed_at = models.DateTimeField("وقت إكمال التقييم", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering = ["candidate__full_name", "stage", "scheduled_at"]
+        verbose_name = "مقابلة توظيف"
+        verbose_name_plural = "جدول مقابلات التوظيف"
+        constraints = [models.UniqueConstraint(fields=["candidate", "stage"], name="hr_unique_candidate_interview_stage")]
+    def __str__(self):
+        return f"{self.candidate.full_name} — {self.get_stage_display()}"
+
+
+class InterviewCriterion(models.Model):
+    interview = models.ForeignKey(RecruitmentInterview, on_delete=models.CASCADE, related_name="criteria", verbose_name="المقابلة")
+    question = models.CharField("السؤال / معيار التقييم", max_length=500)
+    maximum_score = models.DecimalField("الدرجة القصوى", max_digits=6, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    sort_order = models.PositiveSmallIntegerField("الترتيب", default=1)
+    class Meta:
+        ordering = ["sort_order", "id"]
+        verbose_name = "سؤال ومعيار تقييم"
+        verbose_name_plural = "أسئلة ومعايير المقابلات"
+    def __str__(self):
+        return f"{self.sort_order}. {self.question}"
+
+
+class InterviewEvaluation(models.Model):
+    criterion = models.ForeignKey(InterviewCriterion, on_delete=models.CASCADE, related_name="evaluations", verbose_name="السؤال")
+    score = models.DecimalField("الدرجة الممنوحة", max_digits=6, decimal_places=2, default=0, validators=[MinValueValidator(Decimal("0"))])
+    answer_notes = models.TextField("ملاحظات الإجابة", blank=True)
+    evaluated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "تقييم إجابة مقابلة"
+        verbose_name_plural = "تقييمات إجابات المقابلات"
+        constraints = [models.UniqueConstraint(fields=["criterion"], name="hr_unique_interview_criterion_evaluation")]
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.criterion_id and self.score > self.criterion.maximum_score:
+            raise ValidationError({"score": "الدرجة الممنوحة لا يجوز أن تتجاوز الدرجة القصوى للسؤال."})
+    def __str__(self):
+        return f"{self.criterion} — {self.score}"
