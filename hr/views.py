@@ -488,10 +488,27 @@ def recruitment_interviews(request):
             if stage not in RecruitmentInterview.Stage.values:
                 messages.error(request, "مرحلة المقابلة غير صحيحة.")
                 return redirect("hr:recruitment_interviews")
+            # Enforce the interview chain: HR -> department manager -> executive.
+            prerequisites = {
+                RecruitmentInterview.Stage.DEPARTMENT: RecruitmentInterview.Stage.HR,
+                RecruitmentInterview.Stage.EXECUTIVE: RecruitmentInterview.Stage.DEPARTMENT,
+            }
+            previous_stage = prerequisites.get(stage)
+            if previous_stage:
+                previous = RecruitmentInterview.objects.filter(
+                    candidate=candidate, stage=previous_stage,
+                    status=RecruitmentInterview.Status.COMPLETED,
+                    recommendation="advance",
+                ).first()
+                if not previous:
+                    messages.error(request, "لا يمكن جدولة هذه المرحلة قبل اجتياز المرحلة السابقة بتوصية انتقال.")
+                    return redirect("hr:recruitment_interviews")
             scheduled_at = parse_datetime(request.POST.get("scheduled_at", ""))
             if not scheduled_at:
                 messages.error(request, "أدخل موعد مقابلة صحيحًا.")
                 return redirect("hr:recruitment_interviews")
+            if timezone.is_naive(scheduled_at):
+                scheduled_at = timezone.make_aware(scheduled_at, timezone.get_current_timezone())
             interviewer = Employee.objects.filter(pk=request.POST.get("interviewer")).first() if request.POST.get("interviewer") else None
             if RecruitmentInterview.objects.filter(candidate=candidate, stage=stage).exists():
                 messages.error(request, "توجد مقابلة مسجلة بالفعل لهذا المرشح في هذه المرحلة.")
