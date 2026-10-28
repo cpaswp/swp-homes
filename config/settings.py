@@ -13,7 +13,7 @@ INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
     "rest_framework", "core.apps.CoreConfig", "accounting.apps.AccountingConfig",
-    "leasing.apps.LeasingConfig",
+    "leasing.apps.LeasingConfig", "hr.apps.HrConfig",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware", "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -48,9 +48,6 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-# Manifest hashing is required for production deployment, but it makes test runs
-# fail before collectstatic has generated the manifest. Use plain static storage
-# in development/CI and keep compressed manifest storage in production.
 STATICFILES_BACKEND = (
     "whitenoise.storage.CompressedManifestStaticFilesStorage"
     if os.getenv("DJANGO_ENV", "development").lower() == "production"
