@@ -44,3 +44,20 @@ def test_overallocation_rejected():
         amount=Decimal("9000.00"), cash_account_code="1100")
     with pytest.raises(ValidationError):
         allocate_receipt(receipt.id, [{"charge_id":charge.id,"amount":"9000.00"}])
+
+
+@pytest.mark.django_db
+def test_receipt_allocation_rejects_currency_mismatch():
+    c = Company.objects.create(name="شركة")
+    tenant = Party.objects.create(company=c, display_name="مستأجر")
+    p = Property.objects.create(company=c, code="P1", name="عقار", kind="residential", ownership_type="company_owned")
+    u = Unit.objects.create(company=c, property=p, code="U1", kind="apartment")
+    lease = Lease.objects.create(company=c, lease_number="L-CUR", unit=u, tenant=tenant,
+        start_date=date(2026, 1, 1), end_date=date(2026, 1, 31), rent_amount=Decimal("100.00"))
+    charge = LeaseCharge.objects.create(company=c, lease=lease, due_date=date(2026, 1, 1),
+        amount=Decimal("100.00"), currency="USD")
+    receipt = Receipt.objects.create(company=c, receipt_number="R-CUR", tenant=tenant,
+        receipt_date=date(2026, 1, 5), amount=Decimal("100.00"), currency="EGP", cash_account_code="1100")
+    with pytest.raises(ValidationError, match="currencies must match"):
+        allocate_receipt(receipt.id, [{"charge_id": charge.id, "amount": "50.00"}])
+    assert not receipt.allocations.exists()
