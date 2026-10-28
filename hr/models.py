@@ -1171,14 +1171,13 @@ class InterviewCriterion(models.Model):
 
 
 class InterviewEvaluation(models.Model):
-    criterion = models.ForeignKey(InterviewCriterion, on_delete=models.CASCADE, related_name="evaluations", verbose_name="السؤال")
+    criterion = models.OneToOneField(InterviewCriterion, on_delete=models.CASCADE, related_name="evaluation", verbose_name="السؤال")
     score = models.DecimalField("الدرجة الممنوحة", max_digits=6, decimal_places=2, default=0, validators=[MinValueValidator(Decimal("0"))])
     answer_notes = models.TextField("ملاحظات الإجابة", blank=True)
     evaluated_at = models.DateTimeField(auto_now=True)
     class Meta:
         verbose_name = "تقييم إجابة مقابلة"
         verbose_name_plural = "تقييمات إجابات المقابلات"
-        constraints = [models.UniqueConstraint(fields=["criterion"], name="hr_unique_interview_criterion_evaluation")]
     def clean(self):
         from django.core.exceptions import ValidationError
         if self.criterion_id and self.score > self.criterion.maximum_score:
