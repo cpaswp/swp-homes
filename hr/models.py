@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 
 class Department(models.Model):
