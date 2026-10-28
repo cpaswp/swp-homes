@@ -467,3 +467,127 @@ def record_attachments(request):
         "models": [{"name": m.__name__, "label": m._meta.verbose_name_plural} for m in model_list],
         "selected_model": model_name, "object_id": object_id, "target": target, "attachments": attachments,
     })
+
+
+@login_required
+def recruitment_interviews(request):
+    """Interview calendar, weighted scoring, stage progression and candidate ranking."""
+    from decimal import Decimal, InvalidOperation
+    from django.contrib import messages
+    from django.core.exceptions import ValidationError
+    from django.db import transaction
+    from django.db.models import Avg, Count
+    from django.utils.dateparse import parse_datetime
+    from .models import RecruitmentCandidate, RecruitmentInterview, InterviewCriterion, InterviewEvaluation
+
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        if action == "schedule":
+            candidate = get_object_or_404(RecruitmentCandidate, pk=request.POST.get("candidate"))
+            stage = request.POST.get("stage", "")
+            if stage not in RecruitmentInterview.Stage.values:
+                messages.error(request, "مرحلة المقابلة غير صحيحة.")
+                return redirect("hr:recruitment_interviews")
+            scheduled_at = parse_datetime(request.POST.get("scheduled_at", ""))
+            if not scheduled_at:
+                messages.error(request, "أدخل موعد مقابلة صحيحًا.")
+                return redirect("hr:recruitment_interviews")
+            interviewer = Employee.objects.filter(pk=request.POST.get("interviewer")).first() if request.POST.get("interviewer") else None
+            if RecruitmentInterview.objects.filter(candidate=candidate, stage=stage).exists():
+                messages.error(request, "توجد مقابلة مسجلة بالفعل لهذا المرشح في هذه المرحلة.")
+                return redirect("hr:recruitment_interviews")
+            interview = RecruitmentInterview.objects.create(
+                candidate=candidate, stage=stage, interviewer=interviewer,
+                scheduled_at=scheduled_at, location_or_link=request.POST.get("location_or_link", "").strip(),
+                notes=request.POST.get("notes", "").strip()
+            )
+            added = 0
+            for n in range(1, 11):
+                question = request.POST.get(f"question_{n}", "").strip()
+                maximum = request.POST.get(f"maximum_{n}", "").strip()
+                if not question and not maximum:
+                    continue
+                try:
+                    max_score = Decimal(maximum)
+                    if not question or max_score <= 0:
+                        raise InvalidOperation
+                except (InvalidOperation, ValueError):
+                    interview.delete()
+                    messages.error(request, "لكل سؤال مضاف يجب إدخال نص السؤال ودرجة قصوى أكبر من صفر. لم يتم حفظ المقابلة.")
+                    return redirect("hr:recruitment_interviews")
+                InterviewCriterion.objects.create(interview=interview, question=question, maximum_score=max_score, sort_order=n)
+                added += 1
+            if not added:
+                interview.delete()
+                messages.error(request, "أضف سؤالًا واحدًا على الأقل وحدد درجته قبل حفظ المقابلة.")
+                return redirect("hr:recruitment_interviews")
+            candidate.stage = RecruitmentCandidate.Stage.INTERVIEW
+            candidate.save(update_fields=["stage"])
+            messages.success(request, "تمت جدولة المقابلة وحفظ أسئلتها ودرجاتها.")
+            return redirect("hr:recruitment_interviews")
+
+        if action == "evaluate":
+            interview = get_object_or_404(RecruitmentInterview.objects.select_related("candidate"), pk=request.POST.get("interview"))
+            if interview.status != RecruitmentInterview.Status.SCHEDULED:
+                messages.error(request, "لا يمكن تعديل تقييم مقابلة غير مجدولة.")
+                return redirect("hr:recruitment_interviews")
+            criteria = list(interview.criteria.all())
+            if not criteria:
+                messages.error(request, "لا توجد أسئلة تقييم في هذه المقابلة.")
+                return redirect("hr:recruitment_interviews")
+            earned = Decimal("0")
+            maximum_total = Decimal("0")
+            try:
+                with transaction.atomic():
+                    for criterion in criteria:
+                        score = Decimal(request.POST.get(f"score_{criterion.pk}", "0") or "0")
+                        if score < 0 or score > criterion.maximum_score:
+                            raise ValueError(f"درجة السؤال «{criterion.question}» يجب أن تكون بين صفر و{criterion.maximum_score}.")
+                        evaluation, _ = InterviewEvaluation.objects.get_or_create(criterion=criterion)
+                        evaluation.score = score
+                        evaluation.answer_notes = request.POST.get(f"answer_notes_{criterion.pk}", "").strip()
+                        evaluation.full_clean()
+                        evaluation.save()
+                        earned += score
+                        maximum_total += criterion.maximum_score
+                    if maximum_total <= 0:
+                        raise ValueError("إجمالي الدرجات القصوى يجب أن يكون أكبر من صفر.")
+                    interview.earned_score = earned
+                    interview.maximum_score = maximum_total
+                    interview.score_percent = (earned * Decimal("100") / maximum_total).quantize(Decimal("0.01"))
+                    recommendation = request.POST.get("recommendation", "hold")
+                    if recommendation not in {"advance", "hold", "reject"}:
+                        recommendation = "hold"
+                    interview.recommendation = recommendation
+                    interview.notes = request.POST.get("notes", interview.notes).strip()
+                    interview.status = RecruitmentInterview.Status.COMPLETED
+                    interview.completed_at = timezone.now()
+                    interview.save()
+                    if recommendation == "reject":
+                        interview.candidate.stage = RecruitmentCandidate.Stage.REJECTED
+                        interview.candidate.save(update_fields=["stage"])
+                    elif recommendation == "advance" and interview.stage == RecruitmentInterview.Stage.EXECUTIVE:
+                        interview.candidate.stage = RecruitmentCandidate.Stage.OFFER
+                        interview.candidate.save(update_fields=["stage"])
+            except (ValueError, InvalidOperation, ValidationError) as exc:
+                messages.error(request, str(exc))
+                return redirect("hr:recruitment_interviews")
+            messages.success(request, f"تم حفظ النتيجة: {earned}/{maximum_total} — {interview.score_percent}%.")
+            return redirect("hr:recruitment_interviews")
+
+    interviews = RecruitmentInterview.objects.select_related("candidate", "candidate__position", "interviewer").prefetch_related("criteria__evaluation").all()
+    candidates = RecruitmentCandidate.objects.exclude(stage__in=[RecruitmentCandidate.Stage.HIRED, RecruitmentCandidate.Stage.REJECTED, RecruitmentCandidate.Stage.WITHDRAWN]).order_by("full_name")
+    completed = RecruitmentInterview.objects.filter(status=RecruitmentInterview.Status.COMPLETED)
+    ranking = []
+    for candidate in RecruitmentCandidate.objects.all():
+        rounds = list(completed.filter(candidate=candidate).order_by("stage"))
+        if rounds:
+            average = sum((r.score_percent for r in rounds), Decimal("0")) / Decimal(len(rounds))
+            ranking.append({"candidate": candidate, "rounds": rounds, "average": average.quantize(Decimal("0.01")), "completed_count": len(rounds)})
+    ranking.sort(key=lambda row: (row["average"], row["completed_count"]), reverse=True)
+    return render(request, "hr/recruitment_interviews.html", {
+        "interviews": interviews, "candidates": candidates,
+        "employees": Employee.objects.filter(status=Employee.Status.ACTIVE).order_by("full_name"),
+        "ranking": ranking,
+        "stages": RecruitmentInterview.Stage.choices,
+    })
