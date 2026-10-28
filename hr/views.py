@@ -172,5 +172,8 @@ def management_reports(request):
         "advance_outstanding": advance_totals["outstanding"] or Decimal("0"),
         "planned_vacancies": planned_vacancies,
         "current_assignments_count": current_assignments.count(),
+        "target_rows": target_rows, "target_totals": target_totals,
+        "contracts_expiring": contracts_expiring, "contracts_expired": contracts_expired,
+        "open_warnings": open_warnings,
     }
     return render(request, "hr/management_reports.html", context)
