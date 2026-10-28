@@ -104,4 +104,19 @@ def test_posting_rejects_overlapping_fiscal_periods():
     entry.refresh_from_db()
     assert entry.status == "draft"
 
+@pytest.mark.django_db
+def test_posting_rejects_journal_without_matching_fiscal_period():
+    company = Company.objects.create(name="شركة بلا فترة")
+    cash = Account.objects.create(company=company, code="1100", name="الصندوق", account_type="asset")
+    revenue = Account.objects.create(company=company, code="4100", name="الإيراد", account_type="revenue")
+    entry = JournalEntry.objects.create(company=company, entry_number="JV-NO-PERIOD", entry_date=date(2026,10,1), description="اختبار بلا فترة")
+    JournalLine.objects.create(entry=entry, account=cash, debit=Decimal("100.00"))
+    JournalLine.objects.create(entry=entry, account=revenue, credit=Decimal("100.00"))
+
+    with pytest.raises(PostingError, match="No fiscal period"):
+        post_journal_entry(entry.id)
+
+    entry.refresh_from_db()
+    assert entry.status == "draft"
+
 
