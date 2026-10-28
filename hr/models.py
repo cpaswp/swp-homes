@@ -1099,3 +1099,24 @@ class HiringDocumentTemplate(models.Model):
         verbose_name_plural = "مصوغات التعيين المطلوبة"
     def __str__(self):
         return f"{self.code} — {self.title}"
+
+
+class RecordAttachment(models.Model):
+    """Reusable document attachments for any HR record."""
+    content_type = models.ForeignKey("contenttypes.ContentType", on_delete=models.CASCADE, verbose_name="نوع السجل")
+    object_id = models.PositiveBigIntegerField("رقم السجل")
+    content_object = models.GenericForeignKey("content_type", "object_id")
+    title = models.CharField("عنوان المرفق", max_length=180)
+    file = models.FileField("الملف المرفق", upload_to="hr/record-attachments/%Y/%m/")
+    category = models.CharField("تصنيف المرفق", max_length=80, blank=True)
+    issue_date = models.DateField("تاريخ المستند", null=True, blank=True)
+    expiry_date = models.DateField("تاريخ الانتهاء", null=True, blank=True)
+    notes = models.TextField("ملاحظات", blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="رفع بواسطة")
+    uploaded_at = models.DateTimeField("تاريخ الرفع", auto_now_add=True)
+    class Meta:
+        ordering = ["-uploaded_at"]
+        verbose_name = "مرفق مستند لسجل"
+        verbose_name_plural = "مرفقات المستندات والسجلات"
+    def __str__(self):
+        return f"{self.title} ({self.content_type_id}:{self.object_id})"
