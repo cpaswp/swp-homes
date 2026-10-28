@@ -160,7 +160,7 @@ def management_reports(request):
         target.budget_used_pct = min(target.actual_cost / target.budget_amount * 100, Decimal("999.99")) if target.budget_amount else Decimal("0")
         for key in target_totals:
             target_totals[key] += getattr(target, key)
-    target_totals["quantity_pct"] = target_totals["actual_quantity"] / target_totals["target_quantity"] * 100 if target_totals["target_quantity"] else Decimal("0")
+    target_totals["quantity_pct"] = sum((target.quantity_pct for target in target_rows), Decimal("0")) / len(target_rows) if target_rows else Decimal("0")
     target_totals["value_pct"] = target_totals["actual_value"] / target_totals["target_value"] * 100 if target_totals["target_value"] else Decimal("0")
     target_totals["budget_used_pct"] = target_totals["actual_cost"] / target_totals["budget_amount"] * 100 if target_totals["budget_amount"] else Decimal("0")
     active_contracts = EmployeeContract.objects.filter(status=EmployeeContract.Status.ACTIVE)
