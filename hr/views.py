@@ -55,7 +55,7 @@ def employee_detail_api(request, employee_id):
 def org_chart(request):
     employees = list(Employee.objects.filter(status=Employee.Status.ACTIVE).select_related("department", "position", "manager").order_by("full_name"))
     nodes = [{"id": e.pk, "name": e.full_name, "code": e.employee_code, "title": e.position.title if e.position_id else "غير محدد", "department": e.department.name if e.department_id else "غير محدد", "manager_id": e.manager_id} for e in employees]
-    return render(request, "hr/org_chart.html", {"nodes_json": json.dumps(nodes, ensure_ascii=False)})
+    return render(request, "hr/org_chart.html", {"nodes": nodes})
 
 
 @login_required
