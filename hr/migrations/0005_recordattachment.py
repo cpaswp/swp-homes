@@ -6,6 +6,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("hr", "0004_seed_hiring_document_templates"),
         ("contenttypes", "0002_remove_content_type_name"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
     operations = [
         migrations.CreateModel(
