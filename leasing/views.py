@@ -68,8 +68,9 @@ def receipt_create(request):
         messages.error(request,'ليس لديك صلاحية إنشاء سندات القبض.'); return redirect('receipt_list')
     form=ReceiptForm(request.POST or None,company=m.company,language=lang)
     if request.method=='POST' and form.is_valid():
-        receipt=form.save(commit=False); receipt.company=m.company; receipt.save()
-        AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.create',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'receipt_number':receipt.receipt_number,'amount':str(receipt.amount)})
+        with transaction.atomic():
+            receipt=form.save(commit=False); receipt.company=m.company; receipt.save()
+            AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.create',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'receipt_number':receipt.receipt_number,'amount':str(receipt.amount)})
         messages.success(request,'تم إنشاء سند القبض كمسودة. راجعه ثم رحّله محاسبيًا.'); return redirect('receipt_list')
     return render(request,'leasing/receipt_form.html',{'language':lang,'active_company':m.company,'form':form})
 
