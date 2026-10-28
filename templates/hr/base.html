@@ -3,6 +3,7 @@
 <a href="{% url 'hr:dashboard' %}">▦ <span>{% if request.LANGUAGE_CODE == 'en' %}Dashboard{% else %}لوحة التحكم{% endif %}</span></a>
 <a href="{% url 'hr:employees' %}">♙ <span>{% if request.LANGUAGE_CODE == 'en' %}Employee Records{% else %}ملفات الموظفين{% endif %}</span></a>
 <a href="{% url 'hr:recruitment_interviews' %}">♧ <span>{% if request.LANGUAGE_CODE == 'en' %}Recruitment Interviews{% else %}مقابلات التوظيف{% endif %}</span></a>
+<a href="{% url 'hr:talent_center' %}">✦ <span>{% if request.LANGUAGE_CODE == 'en' %}Talent & Skills{% else %}المواهب والمهارات{% endif %}</span></a>
 <a href="{% url 'hr:org_chart' %}">⌘ <span>{% if request.LANGUAGE_CODE == 'en' %}Organization Chart{% else %}الهيكل التنظيمي{% endif %}</span></a>
 <a href="{% url 'hr:payroll' %}">▤ <span>{% if request.LANGUAGE_CODE == 'en' %}Payroll{% else %}المرتبات{% endif %}</span></a>
 <a href="{% url 'hr:approvals' %}">✓ <span>{% if request.LANGUAGE_CODE == 'en' %}Approvals{% else %}الاعتمادات{% endif %}</span></a>
