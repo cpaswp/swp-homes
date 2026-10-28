@@ -527,3 +527,160 @@ class EmployeeAuditEvent(models.Model):
         ordering = ["-created_at"]
         verbose_name = "سجل تدقيق موظف"
         verbose_name_plural = "سجل تدقيق الموارد البشرية"
+
+
+class EmployeeRequirement(models.Model):
+    class Status(models.TextChoices):
+        REQUIRED = "required", "مطلوب"
+        SUBMITTED = "submitted", "تم التسليم"
+        VERIFIED = "verified", "تمت المراجعة"
+        REJECTED = "rejected", "مرفوض"
+        WAIVED = "waived", "معفى"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="requirements", verbose_name="الموظف")
+    title = models.CharField("المطلوب من الموظف", max_length=180)
+    category = models.CharField("التصنيف", max_length=80, blank=True)
+    required_by = models.DateField("الموعد النهائي", null=True, blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.REQUIRED)
+    submitted_at = models.DateField("تاريخ التسليم", null=True, blank=True)
+    verified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="verified_employee_requirements", verbose_name="راجع المستند")
+    verified_at = models.DateTimeField("تاريخ المراجعة", null=True, blank=True)
+    document = models.ForeignKey(EmployeeDocument, on_delete=models.SET_NULL, null=True, blank=True, related_name="requirement_evidence", verbose_name="المستند المرفق")
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["status", "required_by"]
+        verbose_name = "مطلوب من موظف"
+        verbose_name_plural = "متطلبات ومستندات الموظفين"
+
+
+class PositionAssignment(models.Model):
+    class Status(models.TextChoices):
+        PLANNED = "planned", "مخطط"
+        ACTIVE = "active", "ساري"
+        ENDED = "ended", "منتهي"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="position_assignments", verbose_name="الموظف")
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="assignments", verbose_name="الإدارة")
+    position = models.ForeignKey(JobPosition, on_delete=models.PROTECT, related_name="assignments", verbose_name="الوظيفة")
+    start_date = models.DateField("من تاريخ")
+    end_date = models.DateField("حتى تاريخ", null=True, blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.PLANNED)
+    acting_for = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="acting_substitutes", verbose_name="بديل عن الموظف")
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, null=True, blank=True, related_name="position_assignments", verbose_name="طلب الاعتماد")
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["-start_date"]
+        verbose_name = "تسكين/تكليف وظيفي"
+        verbose_name_plural = "التسكين والتكليف والبدائل"
+
+
+class DepartmentWorkforcePlan(models.Model):
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="workforce_plans", verbose_name="الإدارة")
+    fiscal_year = models.PositiveSmallIntegerField("السنة المالية")
+    approved_headcount = models.PositiveIntegerField("العدد المعتمد")
+    minimum_headcount = models.PositiveIntegerField("الحد الأدنى", default=0)
+    maximum_headcount = models.PositiveIntegerField("الحد الأقصى")
+    approved_annual_payroll_budget = models.DecimalField("موازنة المرتبات السنوية", max_digits=15, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    approved_monthly_payroll_budget = models.DecimalField("موازنة المرتبات الشهرية", max_digits=15, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_workforce_plans", verbose_name="اعتمدت بواسطة")
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, null=True, blank=True, related_name="workforce_plans", verbose_name="طلب الاعتماد")
+    notes = models.TextField("ملاحظات", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        unique_together = [("department", "fiscal_year")]
+        ordering = ["-fiscal_year", "department__name"]
+        verbose_name = "خطة قوى عاملة وموازنة"
+        verbose_name_plural = "حدود وموازنة الإدارات"
+
+
+class AdvancePolicy(models.Model):
+    name = models.CharField("اسم سياسة السلف", max_length=120)
+    maximum_amount = models.DecimalField("الحد الأقصى للسلفة", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    maximum_salary_multiple = models.DecimalField("مضاعف الراتب الأقصى", max_digits=6, decimal_places=2, default=Decimal("1"), validators=[MinValueValidator(0)])
+    maximum_active_advances = models.PositiveSmallIntegerField("أقصى عدد سلف قائمة", default=1)
+    maximum_deduction_percent = models.DecimalField("أقصى نسبة استقطاع شهري %", max_digits=5, decimal_places=2, default=Decimal("25"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    minimum_service_months = models.PositiveSmallIntegerField("مدة الخدمة المطلوبة بالشهور", default=0)
+    active = models.BooleanField("نشطة", default=True)
+    effective_from = models.DateField("سارية من")
+    effective_to = models.DateField("سارية حتى", null=True, blank=True)
+    class Meta:
+        verbose_name = "سياسة سلف"
+        verbose_name_plural = "سياسات وحدود السلف"
+
+
+class EmployeeAdvance(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        PENDING = "pending", "بانتظار الاعتماد"
+        APPROVED = "approved", "معتمدة"
+        DISBURSED = "disbursed", "تم الصرف"
+        REPAYING = "repaying", "قيد السداد"
+        SETTLED = "settled", "مسددة"
+        REJECTED = "rejected", "مرفوضة"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="advances", verbose_name="الموظف")
+    policy = models.ForeignKey(AdvancePolicy, on_delete=models.PROTECT, related_name="requests", verbose_name="سياسة السلف")
+    request_date = models.DateField("تاريخ الطلب")
+    requested_amount = models.DecimalField("المبلغ المطلوب", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    approved_amount = models.DecimalField("المبلغ المعتمد", max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    installment_amount = models.DecimalField("قيمة القسط", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    installments_count = models.PositiveSmallIntegerField("عدد الأقساط", default=1)
+    remaining_balance = models.DecimalField("الرصيد المتبقي", max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, null=True, blank=True, related_name="employee_advances", verbose_name="طلب الاعتماد")
+    payroll_deduction = models.ForeignKey(EmployeeDeduction, on_delete=models.SET_NULL, null=True, blank=True, related_name="advance_requests", verbose_name="استقطاع السداد")
+    disbursed_at = models.DateField("تاريخ الصرف", null=True, blank=True)
+    notes = models.TextField("ملاحظات", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-request_date"]
+        verbose_name = "سلفة موظف"
+        verbose_name_plural = "طلبات السلف وسدادها"
+
+
+class CustodyAsset(models.Model):
+    class Status(models.TextChoices):
+        AVAILABLE = "available", "متاح"
+        ASSIGNED = "assigned", "بعهدة موظف"
+        MAINTENANCE = "maintenance", "صيانة"
+        LOST = "lost", "مفقود"
+        RETIRED = "retired", "مستبعد"
+    asset_code = models.CharField("كود العهدة", max_length=40, unique=True)
+    name = models.CharField("اسم العهدة", max_length=180)
+    category = models.CharField("التصنيف", max_length=80)
+    serial_number = models.CharField("الرقم المسلسل", max_length=120, blank=True)
+    acquisition_date = models.DateField("تاريخ الشراء", null=True, blank=True)
+    acquisition_cost = models.DecimalField("تكلفة الشراء", max_digits=14, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    current_value = models.DecimalField("القيمة الدفترية الحالية", max_digits=14, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.AVAILABLE)
+    insured = models.BooleanField("مؤمن عليها", default=False)
+    insurance_policy_number = models.CharField("رقم وثيقة التأمين", max_length=100, blank=True)
+    insurer = models.CharField("شركة التأمين", max_length=160, blank=True)
+    insurance_start = models.DateField("بداية التأمين", null=True, blank=True)
+    insurance_end = models.DateField("نهاية التأمين", null=True, blank=True)
+    insured_value = models.DecimalField("القيمة المؤمن عليها", max_digits=14, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0)])
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["asset_code"]
+        verbose_name = "عهدة/أصل"
+        verbose_name_plural = "سجل العهد والأصول"
+
+
+class CustodyAssignment(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "بعهدة الموظف"
+        RETURNED = "returned", "تم الرد"
+        LOST = "lost", "مفقود"
+        DAMAGED = "damaged", "تالف"
+    asset = models.ForeignKey(CustodyAsset, on_delete=models.PROTECT, related_name="assignments", verbose_name="العهدة")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="custody_assignments", verbose_name="الموظف")
+    issued_at = models.DateField("تاريخ التسليم")
+    expected_return = models.DateField("تاريخ الرد المتوقع", null=True, blank=True)
+    returned_at = models.DateField("تاريخ الرد الفعلي", null=True, blank=True)
+    condition_out = models.CharField("حالة التسليم", max_length=120, blank=True)
+    condition_in = models.CharField("حالة الاستلام", max_length=120, blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    custody_document = models.FileField("محضر تسليم/استلام", upload_to="hr/custody/%Y/%m/", blank=True)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, null=True, blank=True, related_name="custody_assignments", verbose_name="طلب الاعتماد")
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        ordering = ["-issued_at"]
+        verbose_name = "تسليم عهدة"
+        verbose_name_plural = "حركة عهد الموظفين"
