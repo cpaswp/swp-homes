@@ -30,6 +30,24 @@ def test_unbalanced_journal_rejected():
     assert entry.status == "draft"
 
 @pytest.mark.django_db
+def test_posting_rejects_account_from_another_company():
+    company = Company.objects.create(name="الشركة الأولى")
+    other_company = Company.objects.create(name="الشركة الثانية")
+    FiscalPeriod.objects.create(company=company, name="2026", start_date=date(2026,1,1), end_date=date(2026,12,31))
+    cash = Account.objects.create(company=company, code="1100", name="الصندوق", account_type="asset")
+    foreign_revenue = Account.objects.create(company=other_company, code="4100", name="إيراد أجنبي", account_type="revenue")
+    entry = JournalEntry.objects.create(company=company, entry_number="JV-CROSS-CO", entry_date=date(2026,10,1), description="اختبار عزل الشركات")
+    JournalLine.objects.create(entry=entry, account=cash, debit=Decimal("100.00"))
+    JournalLine.objects.create(entry=entry, account=foreign_revenue, credit=Decimal("100.00"))
+
+    with pytest.raises(PostingError, match="another company"):
+        post_journal_entry(entry.id)
+
+    entry.refresh_from_db()
+    assert entry.status == "draft"
+
+
+@pytest.mark.django_db
 def test_posting_rejects_manual_posting_to_control_account():
     company = Company.objects.create(name="شركة")
     FiscalPeriod.objects.create(company=company, name="2026", start_date=date(2026,1,1), end_date=date(2026,12,31))
