@@ -6,7 +6,8 @@ from .models import (
     EmployeeInsuranceRecord, InsuranceFormRecord, SalaryChange, PayrollComponent, EmployeeDeduction,
     InternalRegulation, DisciplinaryAction, KPI, PerformanceReview, TrainingCourse, EmployeeTraining,
     EmployeeAuditEvent, EmployeeRequirement, PositionAssignment, DepartmentWorkforcePlan,
-    AdvancePolicy, EmployeeAdvance, CustodyAsset, CustodyAssignment, EmployeeContract, EmployeeWarning,\n    EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
+    AdvancePolicy, EmployeeAdvance, CustodyAsset, CustodyAssignment, EmployeeContract, EmployeeWarning,
+    EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
 )
 
 
