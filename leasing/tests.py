@@ -77,3 +77,13 @@ def test_receipt_allocation_rejects_charge_currency_different_from_lease():
     with pytest.raises(ValidationError, match="Charge currency must match its lease currency"):
         allocate_receipt(receipt.id, [{"charge_id": charge.id, "amount": "50.00"}])
     assert not receipt.allocations.exists()
+
+@pytest.mark.django_db
+def test_empty_receipt_allocation_is_rejected():
+    c = Company.objects.create(name="شركة")
+    tenant = Party.objects.create(company=c, display_name="مستأجر")
+    receipt = Receipt.objects.create(company=c, receipt_number="R-EMPTY", tenant=tenant,
+        receipt_date=date(2026, 1, 5), amount=Decimal("100.00"), cash_account_code="1100")
+    with pytest.raises(ValidationError, match="At least one allocation is required"):
+        allocate_receipt(receipt.id, [])
+    assert not receipt.allocations.exists()
