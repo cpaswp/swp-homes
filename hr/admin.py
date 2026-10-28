@@ -10,7 +10,8 @@ from .models import (
     EmployeeCompensationItem, DepartmentTarget, TargetAchievement,
     AttendanceDeviceConfiguration, RegulationRule, HiringDocumentTemplate, OfferLetter, EmployeeDependent, EmployeeMedicalBenefit, EmployeeHousingAssignment,
     EmployeeChildcareBenefit, EmployeeBenefitEnrollment,
-)
+    RecruitmentInterview, InterviewCriterion, InterviewEvaluation,
+
 
 
 @admin.register(Employee)
@@ -55,3 +56,5 @@ admin.site.register([
     OfferLetter, EmployeeDependent, EmployeeMedicalBenefit, EmployeeHousingAssignment,
     EmployeeChildcareBenefit, EmployeeBenefitEnrollment, AttendanceDeviceConfiguration, RegulationRule, HiringDocumentTemplate, RecordAttachment,
 ])
+
+admin.site.register([RecruitmentInterview, InterviewCriterion, InterviewEvaluation])
