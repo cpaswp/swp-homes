@@ -620,7 +620,8 @@ def talent_center(request):
     from django.core.exceptions import ValidationError
     from django.db import IntegrityError, transaction
 
-    if not request.user.is_staff:
+    view_permissions = ("hr.view_skill", "hr.view_employeeskill", "hr.view_careerdevelopmentplan", "hr.view_successionplan")
+    if not request.user.is_superuser and not request.user.has_perms(view_permissions):
         return HttpResponseForbidden("Access denied")
 
     english = request.LANGUAGE_CODE == "en"
@@ -636,6 +637,8 @@ def talent_center(request):
         try:
             with transaction.atomic():
                 if action == "skill":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_skill"):
+                        return HttpResponseForbidden("Access denied")
                     name = request.POST.get("name", "").strip()
                     if not name:
                         raise ValueError
@@ -645,6 +648,10 @@ def talent_center(request):
                         description=request.POST.get("description", "").strip(),
                     )
                 elif action == "assessment":
+                    if not request.user.is_superuser and not (
+                        request.user.has_perm("hr.add_employeeskill") or request.user.has_perm("hr.change_employeeskill")
+                    ):
+                        return HttpResponseForbidden("Access denied")
                     employee = get_object_or_404(Employee, pk=request.POST.get("employee"))
                     skill = get_object_or_404(Skill, pk=request.POST.get("skill"), is_active=True)
                     level = int(request.POST.get("level", "0"))
@@ -660,6 +667,8 @@ def talent_center(request):
                         },
                     )
                 elif action == "development":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_careerdevelopmentplan"):
+                        return HttpResponseForbidden("Access denied")
                     employee = get_object_or_404(Employee, pk=request.POST.get("employee"))
                     start = date.fromisoformat(request.POST["start_date"]) if request.POST.get("start_date") else None
                     target = date.fromisoformat(request.POST["target_date"]) if request.POST.get("target_date") else None
@@ -677,6 +686,8 @@ def talent_center(request):
                         status=CareerDevelopmentPlan.Status.ACTIVE,
                     )
                 elif action == "succession":
+                    if not request.user.is_superuser and not request.user.has_perm("hr.add_successionplan"):
+                        return HttpResponseForbidden("Access denied")
                     position = get_object_or_404(JobPosition, pk=request.POST.get("position"), is_active=True)
                     nominee = get_object_or_404(Employee, pk=request.POST.get("nominee"), status=Employee.Status.ACTIVE)
                     if not request.POST.get("readiness") in dict(SuccessionPlan.Readiness.choices):
