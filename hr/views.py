@@ -462,7 +462,7 @@ def record_attachments(request):
             )
             messages.success(request, "تم إرفاق المستند بالسجل.")
             return redirect(f"{request.path}?model={model_name}&object_id={object_id}")
-    attachments = RecordAttachment.objects.filter(content_type__model=selected_model._meta.model_name, object_id=object_id) if target else RecordAttachment.objects.none()
+    attachments = RecordAttachment.objects.filter(content_type__app_label="hr", content_type__model=selected_model._meta.model_name, object_id=object_id) if target else RecordAttachment.objects.none()
     return render(request, "hr/record_attachments.html", {
         "models": [{"name": m.__name__, "label": m._meta.verbose_name_plural} for m in model_list],
         "selected_model": model_name, "object_id": object_id, "target": target, "attachments": attachments,
