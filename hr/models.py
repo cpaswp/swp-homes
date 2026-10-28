@@ -194,3 +194,336 @@ class PayrollItem(models.Model):
         unique_together = [("period", "employee")]
         verbose_name = "بند مرتب"
         verbose_name_plural = "بنود المرتبات"
+
+
+# Operational HR modules. All records are linked to the canonical Employee record.
+class LeavePolicy(models.Model):
+    code = models.CharField("كود نوع الإجازة", max_length=24, unique=True)
+    name = models.CharField("نوع الإجازة", max_length=100)
+    annual_entitlement_days = models.DecimalField("الرصيد السنوي", max_digits=6, decimal_places=2, default=Decimal("0"))
+    carry_forward_limit_days = models.DecimalField("حد الترحيل", max_digits=6, decimal_places=2, default=Decimal("0"))
+    paid = models.BooleanField("مدفوعة", default=True)
+    requires_document = models.BooleanField("تتطلب مستنداً", default=False)
+    active = models.BooleanField("نشطة", default=True)
+    class Meta:
+        verbose_name = "لائحة نوع إجازة"
+        verbose_name_plural = "لوائح أنواع الإجازات"
+    def __str__(self):
+        return self.name
+
+
+class EmployeeLeaveBalance(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="leave_balances", verbose_name="الموظف")
+    policy = models.ForeignKey(LeavePolicy, on_delete=models.PROTECT, related_name="balances", verbose_name="نوع الإجازة")
+    year = models.PositiveSmallIntegerField("السنة")
+    opening_days = models.DecimalField("رصيد أول المدة", max_digits=7, decimal_places=2, default=Decimal("0"))
+    accrued_days = models.DecimalField("المستحق خلال السنة", max_digits=7, decimal_places=2, default=Decimal("0"))
+    used_days = models.DecimalField("المستخدم", max_digits=7, decimal_places=2, default=Decimal("0"))
+    adjusted_days = models.DecimalField("تسويات", max_digits=7, decimal_places=2, default=Decimal("0"))
+    class Meta:
+        unique_together = [("employee", "policy", "year")]
+        verbose_name = "رصيد إجازة موظف"
+        verbose_name_plural = "أرصدة إجازات الموظفين"
+    @property
+    def remaining_days(self):
+        return self.opening_days + self.accrued_days + self.adjusted_days - self.used_days
+
+
+class RecruitmentCandidate(models.Model):
+    class Stage(models.TextChoices):
+        NEW = "new", "جديد"
+        SCREENING = "screening", "فرز"
+        INTERVIEW = "interview", "مقابلة"
+        OFFER = "offer", "عرض وظيفي"
+        HIRED = "hired", "تم التعيين"
+        REJECTED = "rejected", "مرفوض"
+        WITHDRAWN = "withdrawn", "انسحب"
+    full_name = models.CharField("اسم المرشح", max_length=180)
+    email = models.EmailField("البريد", blank=True)
+    phone = models.CharField("الهاتف", max_length=40, blank=True)
+    position = models.ForeignKey(JobPosition, on_delete=models.PROTECT, related_name="candidates", null=True, blank=True, verbose_name="الوظيفة المطلوبة")
+    source = models.CharField("مصدر الاستقطاب", max_length=100, blank=True)
+    applied_at = models.DateField("تاريخ التقديم", null=True, blank=True)
+    stage = models.CharField("المرحلة", max_length=20, choices=Stage.choices, default=Stage.NEW)
+    expected_salary = models.DecimalField("الراتب المتوقع", max_digits=12, decimal_places=2, null=True, blank=True)
+    notes = models.TextField("ملاحظات", blank=True)
+    hired_employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="recruitment_source", null=True, blank=True, verbose_name="ملف الموظف الناتج")
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "مرشح توظيف"
+        verbose_name_plural = "سجل استقطاب الموظفين"
+
+
+class MissionRequest(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        PENDING = "pending", "بانتظار الاعتماد"
+        APPROVED = "approved", "معتمدة"
+        REJECTED = "rejected", "مرفوضة"
+        COMPLETED = "completed", "منتهية"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="missions", verbose_name="الموظف")
+    destination = models.CharField("جهة المأمورية", max_length=180)
+    purpose = models.TextField("الغرض")
+    start_at = models.DateTimeField("بداية المأمورية")
+    end_at = models.DateTimeField("نهاية المأمورية")
+    transport_allowance = models.DecimalField("بدل انتقال", max_digits=12, decimal_places=2, default=Decimal("0"))
+    per_diem = models.DecimalField("بدل يومي", max_digits=12, decimal_places=2, default=Decimal("0"))
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name="missions", verbose_name="طلب الاعتماد")
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-start_at"]
+        verbose_name = "مأمورية"
+        verbose_name_plural = "المأموريات"
+
+
+class AttendanceException(models.Model):
+    class Kind(models.TextChoices):
+        LATE = "late", "تأخير"
+        EARLY = "early", "انصراف مبكر"
+        ABSENCE = "absence", "غياب"
+        OVERTIME = "overtime", "إضافي"
+        MANUAL = "manual", "تعديل يدوي"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="attendance_exceptions", verbose_name="الموظف")
+    work_date = models.DateField("تاريخ العمل")
+    kind = models.CharField("النوع", max_length=20, choices=Kind.choices)
+    minutes = models.PositiveIntegerField("الدقائق", default=0)
+    reason = models.TextField("السبب", blank=True)
+    excused = models.BooleanField("مبرر", default=False)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name="attendance_exceptions", verbose_name="طلب الاعتماد")
+    payroll_item = models.ForeignKey(PayrollItem, on_delete=models.SET_NULL, null=True, blank=True, related_name="attendance_exceptions", verbose_name="بند المرتب المرتبط")
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        verbose_name = "استثناء حضور"
+        verbose_name_plural = "التأخيرات والانصراف المبكر والغياب"
+
+
+class EmployeeInsuranceRecord(models.Model):
+    employee = models.OneToOneField(Employee, on_delete=models.PROTECT, related_name="insurance_record", verbose_name="الموظف")
+    insurance_number = models.CharField("الرقم التأميني", max_length=40, blank=True, db_index=True)
+    establishment_number = models.CharField("رقم المنشأة التأمينية", max_length=40, blank=True)
+    insured_salary = models.DecimalField("أجر الاشتراك التأميني", max_digits=12, decimal_places=2, default=Decimal("0"))
+    start_date = models.DateField("تاريخ بدء التأمين", null=True, blank=True)
+    end_date = models.DateField("تاريخ انتهاء التأمين", null=True, blank=True)
+    office = models.CharField("مكتب التأمينات", max_length=160, blank=True)
+    status = models.CharField("حالة التأمين", max_length=40, default="pending")
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        verbose_name = "ملف التأمينات الاجتماعية"
+        verbose_name_plural = "ملفات التأمينات الاجتماعية"
+
+
+class InsuranceFormRecord(models.Model):
+    class FormType(models.TextChoices):
+        S1 = "s1", "نموذج 1 — اشتراك مؤمن عليه"
+        S2 = "s2", "نموذج 2 — تحديث بيانات/أجور (تحقق من النموذج الرسمي الساري)"
+        S6 = "s6", "نموذج 6 — إنهاء اشتراك"
+    class Status(models.TextChoices):
+        DRAFT = "draft", "مسودة"
+        PREPARED = "prepared", "مجهز"
+        SUBMITTED = "submitted", "تم التقديم"
+        ACCEPTED = "accepted", "مقبول"
+        REJECTED = "rejected", "مرفوض"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="insurance_forms", verbose_name="الموظف")
+    form_type = models.CharField("نوع النموذج", max_length=8, choices=FormType.choices)
+    reference_number = models.CharField("رقم المرجع", max_length=80, blank=True)
+    effective_date = models.DateField("تاريخ السريان")
+    submitted_at = models.DateField("تاريخ التقديم", null=True, blank=True)
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    attachment = models.FileField("نسخة النموذج/الإيصال", upload_to="hr/insurance-forms/%Y/%m/", blank=True)
+    notes = models.TextField("ملاحظات", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-effective_date"]
+        verbose_name = "معاملة نموذج تأمينات"
+        verbose_name_plural = "نماذج التأمينات"
+
+
+class SalaryChange(models.Model):
+    class ChangeType(models.TextChoices):
+        ANNUAL = "annual", "زيادة سنوية"
+        EXCEPTIONAL = "exceptional", "زيادة استثنائية"
+        PROMOTION = "promotion", "ترقية"
+        ALLOWANCE = "allowance", "تعديل بدل"
+        CORRECTION = "correction", "تصحيح"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="salary_changes", verbose_name="الموظف")
+    change_type = models.CharField("نوع الحركة", max_length=20, choices=ChangeType.choices)
+    effective_date = models.DateField("تاريخ السريان")
+    old_salary = models.DecimalField("الراتب السابق", max_digits=12, decimal_places=2)
+    new_salary = models.DecimalField("الراتب الجديد", max_digits=12, decimal_places=2)
+    percentage = models.DecimalField("نسبة الزيادة %", max_digits=7, decimal_places=3, default=Decimal("0"))
+    reason = models.TextField("المبرر")
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, related_name="salary_changes", verbose_name="طلب الاعتماد")
+    applied = models.BooleanField("تم تطبيق الحركة", default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-effective_date"]
+        verbose_name = "حركة راتب/ترقية"
+        verbose_name_plural = "العلاوات والزيادات والترقيات"
+
+
+class PayrollComponent(models.Model):
+    class Kind(models.TextChoices):
+        EARNING = "earning", "استحقاق"
+        DEDUCTION = "deduction", "استقطاع"
+        TAX = "tax", "ضريبة"
+        INSURANCE = "insurance", "تأمينات"
+        PENALTY = "penalty", "جزاء"
+    code = models.CharField("الكود", max_length=30, unique=True)
+    name = models.CharField("اسم البند", max_length=120)
+    kind = models.CharField("نوع البند", max_length=20, choices=Kind.choices)
+    taxable = models.BooleanField("خاضع للضريبة", default=True)
+    insurable = models.BooleanField("خاضع للتأمينات", default=True)
+    recurring = models.BooleanField("متكرر", default=False)
+    active = models.BooleanField("نشط", default=True)
+    class Meta:
+        verbose_name = "بند مرتب"
+        verbose_name_plural = "تعريف بنود المرتبات"
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+
+class EmployeeDeduction(models.Model):
+    class Kind(models.TextChoices):
+        PENALTY = "penalty", "جزاء"
+        TAX = "tax", "كسب عمل"
+        INSURANCE = "insurance", "تأمينات"
+        ABSENCE = "absence", "غياب"
+        LATE = "late", "تأخير/انصراف مبكر"
+        ADVANCE = "advance", "سلفة"
+        OTHER = "other", "أخرى"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="deductions", verbose_name="الموظف")
+    component = models.ForeignKey(PayrollComponent, on_delete=models.PROTECT, related_name="deductions", null=True, blank=True, verbose_name="بند المرتب")
+    kind = models.CharField("نوع الاستقطاع", max_length=20, choices=Kind.choices)
+    amount = models.DecimalField("القيمة", max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    effective_date = models.DateField("تاريخ السريان")
+    installments = models.PositiveSmallIntegerField("عدد الأقساط", default=1)
+    remaining_installments = models.PositiveSmallIntegerField("الأقساط المتبقية", default=1)
+    reason = models.TextField("السبب")
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, related_name="deductions", null=True, blank=True, verbose_name="طلب الاعتماد")
+    active = models.BooleanField("نشط", default=True)
+    class Meta:
+        verbose_name = "استقطاع موظف"
+        verbose_name_plural = "استقطاعات الموظفين"
+
+
+class InternalRegulation(models.Model):
+    code = models.CharField("كود اللائحة/البند", max_length=40, unique=True)
+    title = models.CharField("اسم البند", max_length=180)
+    category = models.CharField("التصنيف", max_length=80)
+    description = models.TextField("التفاصيل")
+    effective_from = models.DateField("ساري من")
+    effective_to = models.DateField("ساري حتى", null=True, blank=True)
+    active = models.BooleanField("ساري", default=True)
+    document = models.FileField("نسخة اللائحة", upload_to="hr/regulations/%Y/%m/", blank=True)
+    class Meta:
+        ordering = ["category", "code"]
+        verbose_name = "بند لائحة داخلية"
+        verbose_name_plural = "اللائحة الداخلية وبنودها"
+
+
+class DisciplinaryAction(models.Model):
+    class Status(models.TextChoices):
+        INVESTIGATION = "investigation", "قيد التحقيق"
+        PROPOSED = "proposed", "جزاء مقترح"
+        APPROVED = "approved", "معتمد"
+        APPLIED = "applied", "تم التطبيق"
+        CANCELLED = "cancelled", "ملغى"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="disciplinary_actions", verbose_name="الموظف")
+    regulation = models.ForeignKey(InternalRegulation, on_delete=models.PROTECT, related_name="disciplinary_actions", verbose_name="بند اللائحة")
+    incident_date = models.DateField("تاريخ الواقعة")
+    description = models.TextField("وصف الواقعة")
+    investigation_notes = models.TextField("محضر التحقيق/رد الموظف", blank=True)
+    proposed_action = models.CharField("الجزاء المقترح", max_length=180)
+    deduction_amount = models.DecimalField("قيمة الخصم", max_digits=12, decimal_places=2, default=Decimal("0"))
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.INVESTIGATION)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.PROTECT, related_name="disciplinary_actions", null=True, blank=True, verbose_name="طلب الاعتماد")
+    payroll_deduction = models.ForeignKey(EmployeeDeduction, on_delete=models.SET_NULL, related_name="disciplinary_actions", null=True, blank=True, verbose_name="الاستقطاع الناتج")
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-incident_date"]
+        verbose_name = "إجراء تأديبي"
+        verbose_name_plural = "الجزاءات والتحقيقات"
+
+
+class KPI(models.Model):
+    code = models.CharField("كود المؤشر", max_length=30, unique=True)
+    name = models.CharField("اسم المؤشر", max_length=160)
+    description = models.TextField("الوصف", blank=True)
+    weight_percent = models.DecimalField("الوزن النسبي %", max_digits=5, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(0), MaxValueValidator(100)])
+    active = models.BooleanField("نشط", default=True)
+    class Meta:
+        verbose_name = "مؤشر أداء"
+        verbose_name_plural = "مؤشرات الأداء KPI"
+    def __str__(self):
+        return self.name
+
+
+class PerformanceReview(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="performance_reviews", verbose_name="الموظف")
+    reviewer = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="reviews_given", verbose_name="المقيّم")
+    period_start = models.DateField("بداية فترة التقييم")
+    period_end = models.DateField("نهاية فترة التقييم")
+    performance_score = models.DecimalField("الأداء", max_digits=5, decimal_places=2, default=Decimal("0"))
+    behavior_score = models.DecimalField("السلوك", max_digits=5, decimal_places=2, default=Decimal("0"))
+    appearance_score = models.DecimalField("المظهر المهني", max_digits=5, decimal_places=2, default=Decimal("0"))
+    commitment_score = models.DecimalField("الالتزام", max_digits=5, decimal_places=2, default=Decimal("0"))
+    overall_score = models.DecimalField("التقييم الإجمالي", max_digits=5, decimal_places=2, default=Decimal("0"))
+    strengths = models.TextField("نقاط القوة", blank=True)
+    improvement_plan = models.TextField("خطة التحسين", blank=True)
+    status = models.CharField("الحالة", max_length=20, default="draft")
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name="performance_reviews", verbose_name="طلب الاعتماد")
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-period_end"]
+        verbose_name = "تقييم موظف"
+        verbose_name_plural = "تقييمات الأداء والسلوك"
+
+
+class TrainingCourse(models.Model):
+    code = models.CharField("كود الدورة", max_length=30, unique=True)
+    title = models.CharField("اسم البرنامج التدريبي", max_length=180)
+    provider = models.CharField("جهة التدريب", max_length=180, blank=True)
+    skills = models.TextField("المهارات المستهدفة", blank=True)
+    start_date = models.DateField("بداية التدريب", null=True, blank=True)
+    end_date = models.DateField("نهاية التدريب", null=True, blank=True)
+    cost = models.DecimalField("التكلفة", max_digits=12, decimal_places=2, default=Decimal("0"))
+    active = models.BooleanField("نشط", default=True)
+    class Meta:
+        verbose_name = "برنامج تدريبي"
+        verbose_name_plural = "برامج تطوير الموظفين"
+
+
+class EmployeeTraining(models.Model):
+    class Status(models.TextChoices):
+        NOMINATED = "nominated", "مرشح"
+        APPROVED = "approved", "معتمد"
+        IN_PROGRESS = "in_progress", "قيد التنفيذ"
+        COMPLETED = "completed", "مكتمل"
+        FAILED = "failed", "لم يجتز"
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="trainings", verbose_name="الموظف")
+    course = models.ForeignKey(TrainingCourse, on_delete=models.PROTECT, related_name="participants", verbose_name="البرنامج")
+    status = models.CharField("الحالة", max_length=20, choices=Status.choices, default=Status.NOMINATED)
+    score = models.DecimalField("النتيجة", max_digits=5, decimal_places=2, null=True, blank=True)
+    approval_request = models.ForeignKey(ApprovalRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name="training_enrollments", verbose_name="طلب الاعتماد")
+    notes = models.TextField("ملاحظات", blank=True)
+    class Meta:
+        unique_together = [("employee", "course")]
+        verbose_name = "التحاق بتدريب"
+        verbose_name_plural = "سجل تدريب الموظفين"
+
+
+class EmployeeAuditEvent(models.Model):
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="المستخدم المنفذ")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="audit_events", verbose_name="الموظف")
+    event_type = models.CharField("نوع الحركة", max_length=80)
+    object_type = models.CharField("نوع السجل", max_length=80, blank=True)
+    object_id = models.CharField("رقم السجل", max_length=80, blank=True)
+    before_data = models.JSONField("قبل التعديل", default=dict, blank=True)
+    after_data = models.JSONField("بعد التعديل", default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "سجل تدقيق موظف"
+        verbose_name_plural = "سجل تدقيق الموارد البشرية"
