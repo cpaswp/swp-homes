@@ -270,10 +270,7 @@ from .models import RegulationRule, HiringDocumentTemplate
 @login_required
 @staff_member_required
 def compliance_settings(request):
-    today = timezone.localdate()
-    rules = RegulationRule.objects.filter(active=True).filter(effective_from__lte=today).filter(
-        models.Q(effective_to__isnull=True) | models.Q(effective_to__gte=today)
-    ) if False else RegulationRule.objects.filter(active=True)
+    rules = RegulationRule.objects.filter(active=True)
     documents = HiringDocumentTemplate.objects.filter(active=True)
     return render(request, "hr/compliance_settings.html", {
         "rules": rules, "document_templates": documents,
