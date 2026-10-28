@@ -53,3 +53,26 @@ See `PHASE2_STATUS_AR.md` for the exact implemented scope and verification limit
 
 ## Phase 5 — Accounting reports
 See `PHASE5_REPORTS_STATUS_AR.md`. Reports are derived from posted journals and should not be used for statutory reporting until the full accounting workflow, opening balances, cash-flow classifications and Django tests are completed.
+
+## دليل النشر الآمن
+
+### متغيرات البيئة في منصة الاستضافة
+- `DJANGO_ENV=production` و`DJANGO_DEBUG=False`.
+- `DJANGO_SECRET_KEY`: مفتاح عشوائي قوي وفريد، يُحفظ كسر في المنصة فقط.
+- `DJANGO_ALLOWED_HOSTS`: أسماء المضيفين فقط مفصولة بفواصل، دون `https://` أو مسارات.
+- `DJANGO_CSRF_TRUSTED_ORIGINS`: الأصول الكاملة عبر HTTPS مفصولة بفواصل، مثل `https://app.example.com`.
+- `DATABASE_URL`: رابط PostgreSQL/Neon الحالي، محفوظ كسر في المنصة ولا يوضع في Git.
+- `PORT`: تستخدمه صورة Docker تلقائيًا، والافتراضي المحلي 8000.
+
+### إصدار آمن
+1. انتظر نجاح GitHub Actions وراجع التغييرات قبل دمجها إلى `main`.
+2. ابنِ صورة Docker؛ يتم تجهيز ملفات الإنتاج الثابتة وmanifest أثناء البناء.
+3. خذ نسخة احتياطية من قاعدة Neon قبل الترحيلات، وراجع `python manage.py showmigrations`.
+4. نفّذ `python manage.py migrate --noinput` كخطوة إصدار واحدة متحكم بها، لا تلقائيًا مع كل عامل Gunicorn.
+5. بعد النشر اختبر `/health/` وتسجيل الدخول والملفات الثابتة وراجع السجلات.
+6. عند الفشل ارجع لصورة التطبيق السابقة. لا تستخدم `migrate --fake` ولا تحذف قاعدة البيانات.
+
+### حدود التشغيل
+- الملفات المرفوعة محليًا داخل الحاوية ليست دائمة؛ يلزم تخزين دائم لشعارات الشركات قبل الإنتاج.
+- نجاح CI لا يغني عن اختبار الخدمة بعد النشر ولا يعني اكتمال جاهزية النظام المحاسبية.
+- لا تضع الأسرار أو رابط قاعدة البيانات في المستودع أو السجلات.
