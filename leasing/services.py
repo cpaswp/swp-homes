@@ -24,6 +24,9 @@ def generate_lease_schedule(lease_id):
     if lease.charges.filter(schedule_version=lease.schedule_version).exists():
         raise ValidationError("Schedule already exists for this version.")
     cursor = date(lease.start_date.year, lease.start_date.month, min(lease.due_day, monthrange(lease.start_date.year, lease.start_date.month)[1]))
+    # Never create a scheduled charge before the lease actually starts.
+    if cursor < lease.start_date:
+        cursor = add_months(cursor, STEPS[lease.frequency], lease.due_day)
     count = 0
     while cursor <= lease.end_date:
         LeaseCharge.objects.create(company=lease.company, lease=lease, due_date=cursor, amount=lease.rent_amount,
