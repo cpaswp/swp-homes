@@ -698,14 +698,30 @@ def talent_center(request):
         return redirect("hr:talent_center")
 
     employees = Employee.objects.filter(status=Employee.Status.ACTIVE).select_related("department", "position").order_by("full_name")
+    development_plans = list(CareerDevelopmentPlan.objects.select_related("employee", "owner").all()[:100])
+    development_status_labels = {
+        "draft": "Draft", "active": "In progress", "completed": "Completed", "cancelled": "Cancelled"
+    } if english else {
+        "draft": "مسودة", "active": "قيد التنفيذ", "completed": "مكتملة", "cancelled": "ملغاة"
+    }
+    for plan in development_plans:
+        plan.status_label = development_status_labels.get(plan.status, plan.status)
+    succession_plans = list(SuccessionPlan.objects.filter(is_active=True).select_related("position", "nominee", "reviewed_by").all()[:100])
+    readiness_labels = {
+        "ready": "Ready now", "one_year": "Ready within one year",
+        "two_years": "Ready within two years", "development": "Needs development"
+    } if english else dict(SuccessionPlan.Readiness.choices)
+    for plan in succession_plans:
+        plan.readiness_label = readiness_labels.get(plan.readiness, plan.readiness)
+    readiness_choices = [(value, readiness_labels[value]) for value, _label in SuccessionPlan.Readiness.choices]
     return render(request, "hr/talent_center.html", {
         "skills": Skill.objects.filter(is_active=True),
         "assessments": EmployeeSkill.objects.select_related("employee", "skill", "assessed_by").all()[:100],
-        "development_plans": CareerDevelopmentPlan.objects.select_related("employee", "owner").all()[:100],
-        "succession_plans": SuccessionPlan.objects.filter(is_active=True).select_related("position", "nominee", "reviewed_by").all()[:100],
+        "development_plans": development_plans,
+        "succession_plans": succession_plans,
         "employees": employees,
         "positions": JobPosition.objects.filter(is_active=True).select_related("department").order_by("title"),
-        "readiness_choices": SuccessionPlan.Readiness.choices,
+        "readiness_choices": readiness_choices,
         "skill_count": Skill.objects.filter(is_active=True).count(),
         "assessment_count": EmployeeSkill.objects.count(),
         "active_development_count": CareerDevelopmentPlan.objects.filter(status=CareerDevelopmentPlan.Status.ACTIVE).count(),
