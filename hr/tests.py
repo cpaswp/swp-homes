@@ -60,7 +60,7 @@ class HRScreenTests(TestCase):
 class TalentCenterTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
-            username="talent-admin", password="a-strong-test-password", is_staff=True
+            username="talent-admin", password="a-strong-test-password", is_staff=True, is_superuser=True
         )
         self.department = Department.objects.create(code="TAL", name="المواهب")
         self.position = JobPosition.objects.create(code="TAL-01", title="أخصائي مواهب", department=self.department)
