@@ -4,7 +4,7 @@ from django.urls import path
 from django.views.i18n import set_language
 from accounting.views import trial_balance_view, income_statement_view, balance_sheet_view, general_ledger_view
 
-from core.views import dashboard, health, property_list, property_create, unit_list, unit_create
+from core.views import dashboard, health, property_list, property_create, property_update, unit_list, unit_create, unit_update
 from leasing.views import lease_list, lease_create, lease_charges, receipt_list, receipt_create, receipt_post
 
 urlpatterns = [
@@ -19,8 +19,10 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("properties/", property_list, name="property_list"),
     path("properties/new/", property_create, name="property_create"),
+    path("properties/<int:property_id>/edit/", property_update, name="property_update"),
     path("units/", unit_list, name="unit_list"),
     path("units/new/", unit_create, name="unit_create"),
+    path("units/<int:unit_id>/edit/", unit_update, name="unit_update"),
     path("leases/", lease_list, name="lease_list"),
     path("leases/new/", lease_create, name="lease_create"),
     path("leases/charges/", lease_charges, name="lease_charges"),
