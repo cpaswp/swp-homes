@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Sum, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -91,14 +92,15 @@ def property_create(request):
     if request.method == "POST":
         form = PropertyForm(request.POST, company=membership.company, language=language)
         if form.is_valid():
-            obj = form.save(commit=False)
-            obj.company = membership.company
-            obj.save()
-            AuditEvent.objects.create(
-                company=membership.company, actor=request.user, action="property.create",
-                model_label="core.Property", object_id=str(obj.pk),
-                details={"code": obj.code, "name": obj.name},
-            )
+            with transaction.atomic():
+                obj = form.save(commit=False)
+                obj.company = membership.company
+                obj.save()
+                AuditEvent.objects.create(
+                    company=membership.company, actor=request.user, action="property.create",
+                    model_label="core.Property", object_id=str(obj.pk),
+                    details={"code": obj.code, "name": obj.name},
+                )
             messages.success(request, "تم حفظ العقار بنجاح.")
             return redirect("property_list")
     else:
@@ -136,14 +138,15 @@ def unit_create(request):
     if request.method == "POST":
         form = UnitForm(request.POST, company=membership.company, language=language)
         if form.is_valid():
-            obj = form.save(commit=False)
-            obj.company = membership.company
-            obj.save()
-            AuditEvent.objects.create(
-                company=membership.company, actor=request.user, action="unit.create",
-                model_label="core.Unit", object_id=str(obj.pk),
-                details={"code": obj.code, "property_id": obj.property_id},
-            )
+            with transaction.atomic():
+                obj = form.save(commit=False)
+                obj.company = membership.company
+                obj.save()
+                AuditEvent.objects.create(
+                    company=membership.company, actor=request.user, action="unit.create",
+                    model_label="core.Unit", object_id=str(obj.pk),
+                    details={"code": obj.code, "property_id": obj.property_id},
+                )
             messages.success(request, "تم حفظ الوحدة بنجاح.")
             return redirect("unit_list")
     else:
