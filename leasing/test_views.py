@@ -51,7 +51,7 @@ def test_receipt_form_uses_company_postable_asset_accounts_only():
     )
 
     form = ReceiptForm(company=company)
-    choices = dict(form.fields["cash_account_code"].choices)
+    choices = dict(form.fields["cash_account_code"].widget.choices)
     assert eligible.code in choices
     assert "1200" not in choices
     assert "2100" not in choices
