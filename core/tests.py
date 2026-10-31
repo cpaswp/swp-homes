@@ -120,3 +120,25 @@ def test_dashboard_outstanding_does_not_duplicate_charges_with_multiple_allocati
 
     assert response.status_code == 200
     assert response.context["outstanding"] == Decimal("500.00")
+
+
+@pytest.mark.django_db
+def test_property_and_audit_event_are_saved_atomically(client, monkeypatch):
+    from core.models import AuditEvent
+
+    user = get_user_model().objects.create_user(username="atomic-property", password="strong-test-password")
+    company = Company.objects.create(name="Atomic property company")
+    CompanyMembership.objects.create(company=company, user=user, role="owner")
+    client.force_login(user)
+
+    def fail_audit(*args, **kwargs):
+        raise RuntimeError("simulated audit failure")
+
+    monkeypatch.setattr(AuditEvent.objects, "create", fail_audit)
+    with pytest.raises(RuntimeError, match="simulated audit failure"):
+        client.post(reverse("property_create"), {
+            "code": "AT-1", "name": "Atomic test property", "kind": "residential",
+            "ownership_type": "company_owned", "currency": "EGP", "is_active": "on",
+        })
+
+    assert not Property.objects.filter(company=company, code="AT-1").exists()
