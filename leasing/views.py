@@ -83,8 +83,11 @@ def receipt_post(request,receipt_id):
         messages.error(request,'ليس لديك صلاحية ترحيل سندات القبض.'); return redirect('receipt_list')
     receipt=get_object_or_404(Receipt,pk=receipt_id,company=m.company)
     try:
-        entry=post_receipt(receipt.pk)
-        AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.post',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'journal_entry':entry.entry_number})
+        # Posting and its audit trail are one unit: never commit a financial
+        # posting if the corresponding audit event cannot be recorded.
+        with transaction.atomic():
+            entry=post_receipt(receipt.pk)
+            AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.post',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'journal_entry':entry.entry_number})
         messages.success(request,f'تم ترحيل السند إلى القيد {entry.entry_number}.')
     except (ValidationError,ValueError) as exc: messages.error(request,str(exc))
     return redirect('receipt_list')
