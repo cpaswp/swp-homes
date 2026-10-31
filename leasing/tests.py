@@ -102,3 +102,50 @@ def test_empty_receipt_allocation_is_rejected():
     with pytest.raises(ValidationError, match="At least one allocation is required"):
         allocate_receipt(receipt.id, [])
     assert not receipt.allocations.exists()
+
+@pytest.mark.django_db
+def test_receipt_allocation_is_atomic_when_a_later_charge_is_invalid():
+    company = Company.objects.create(name="شركة التخصيص")
+    other_company = Company.objects.create(name="شركة أخرى")
+    tenant = Party.objects.create(company=company, display_name="المستأجر")
+    other_tenant = Party.objects.create(company=other_company, display_name="مستأجر آخر")
+    prop = Property.objects.create(company=company, code="P-ATOMIC", name="عقار", kind="residential", ownership_type="company_owned")
+    unit = Unit.objects.create(company=company, property=prop, code="U-ATOMIC", kind="apartment")
+    lease = Lease.objects.create(company=company, lease_number="L-ATOMIC", unit=unit, tenant=tenant,
+        start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), rent_amount=Decimal("100.00"))
+    valid_charge = LeaseCharge.objects.create(company=company, lease=lease, due_date=date(2026, 1, 1), amount=Decimal("100.00"))
+    other_property = Property.objects.create(company=other_company, code="P-OTHER", name="عقار آخر", kind="residential", ownership_type="company_owned")
+    other_unit = Unit.objects.create(company=other_company, property=other_property, code="U-OTHER", kind="apartment")
+    other_lease = Lease.objects.create(company=other_company, lease_number="L-OTHER", unit=other_unit, tenant=other_tenant,
+        start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), rent_amount=Decimal("100.00"))
+    foreign_charge = LeaseCharge.objects.create(company=other_company, lease=other_lease, due_date=date(2026, 1, 1), amount=Decimal("100.00"))
+    receipt = Receipt.objects.create(company=company, receipt_number="R-ATOMIC", tenant=tenant,
+        receipt_date=date(2026, 1, 5), amount=Decimal("100.00"), cash_account_code="1100")
+
+    with pytest.raises(ValidationError, match="does not belong"):
+        allocate_receipt(receipt.pk, [
+            {"charge_id": valid_charge.pk, "amount": "50.00"},
+            {"charge_id": foreign_charge.pk, "amount": "50.00"},
+        ])
+
+    assert not receipt.allocations.exists()
+    valid_charge.refresh_from_db()
+    assert valid_charge.status == "scheduled"
+
+
+@pytest.mark.django_db
+def test_posted_receipt_cannot_be_allocated_again():
+    company = Company.objects.create(name="شركة سند مرحل")
+    tenant = Party.objects.create(company=company, display_name="مستأجر")
+    prop = Property.objects.create(company=company, code="P-POSTED", name="عقار", kind="residential", ownership_type="company_owned")
+    unit = Unit.objects.create(company=company, property=prop, code="U-POSTED", kind="apartment")
+    lease = Lease.objects.create(company=company, lease_number="L-POSTED", unit=unit, tenant=tenant,
+        start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), rent_amount=Decimal("100.00"))
+    charge = LeaseCharge.objects.create(company=company, lease=lease, due_date=date(2026, 1, 1), amount=Decimal("100.00"))
+    receipt = Receipt.objects.create(company=company, receipt_number="R-POSTED", tenant=tenant,
+        receipt_date=date(2026, 1, 5), amount=Decimal("100.00"), cash_account_code="1100", is_posted=True)
+
+    with pytest.raises(ValidationError, match="Posted receipts cannot be changed"):
+        allocate_receipt(receipt.pk, [{"charge_id": charge.pk, "amount": "100.00"}])
+
+    assert not receipt.allocations.exists()
