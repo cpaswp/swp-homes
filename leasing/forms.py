@@ -30,7 +30,15 @@ class ReceiptForm(forms.ModelForm):
     def __init__(self,*args,company=None,language='ar',**kwargs):
         super().__init__(*args,**kwargs); self.company=company
         self.fields['tenant'].queryset=Party.objects.filter(company=company,is_active=True).order_by('display_name') if company else Party.objects.none()
-        self.fields['cash_account_code'].widget=forms.Select(choices=[(a.code,f'{a.code} — {a.name}') for a in Account.objects.filter(company=company,code__in=['1100','1110'],is_active=True).order_by('code')] if company else [])
+        cash_accounts = Account.objects.filter(
+            company=company, is_active=True, account_type="asset",
+            allow_manual_posting=True, is_control_account=False,
+        ).order_by("code") if company else Account.objects.none()
+        self.fields["cash_account_code"].widget = forms.Select(
+            choices=[("", "---------")] + [
+                (a.code, f"{a.code} — {a.name}") for a in cash_accounts
+            ]
+        )
         labels={"receipt_number":("رقم سند القبض","Receipt number"),"tenant":("المستأجر","Tenant"),"receipt_date":("تاريخ القبض","Receipt date"),"amount":("المبلغ","Amount"),"currency":("العملة","Currency"),"payment_method":("طريقة الدفع","Payment method"),"cash_account_code":("الصندوق / البنك","Cash / bank account"),"external_reference":("المرجع الخارجي","External reference")}
         for n,pair in labels.items(): self.fields[n].label=pair[0] if language=='ar' else pair[1]
     def clean(self):
@@ -38,5 +46,8 @@ class ReceiptForm(forms.ModelForm):
         if self.company and t and t.company_id!=self.company.id: self.add_error('tenant','المستأجر لا يتبع الشركة الحالية.')
         if amount is not None and amount<=0: self.add_error('amount','المبلغ يجب أن يكون أكبر من صفر.')
         if self.company and d.get('currency') and d['currency'].upper()!=self.company.base_currency.upper(): self.add_error('currency','العملة الأجنبية غير مفعلة في هذه المرحلة.')
-        if self.company and d.get('cash_account_code') and not Account.objects.filter(company=self.company,code=d['cash_account_code'],is_active=True).exists(): self.add_error('cash_account_code','حساب الصندوق/البنك غير موجود؛ جهز دليل الحسابات أولًا.')
+        if self.company and d.get('cash_account_code') and not Account.objects.filter(
+            company=self.company, code=d['cash_account_code'], is_active=True,
+            account_type="asset", allow_manual_posting=True, is_control_account=False,
+        ).exists(): self.add_error('cash_account_code','حساب الصندوق/البنك غير موجود؛ جهز دليل الحسابات أولًا.')
         return d

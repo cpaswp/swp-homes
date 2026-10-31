@@ -24,6 +24,9 @@ def generate_lease_schedule(lease_id):
     if lease.charges.filter(schedule_version=lease.schedule_version).exists():
         raise ValidationError("Schedule already exists for this version.")
     cursor = date(lease.start_date.year, lease.start_date.month, min(lease.due_day, monthrange(lease.start_date.year, lease.start_date.month)[1]))
+    # Never create a scheduled charge before the lease actually starts.
+    if cursor < lease.start_date:
+        cursor = add_months(cursor, STEPS[lease.frequency], lease.due_day)
     count = 0
     while cursor <= lease.end_date:
         LeaseCharge.objects.create(company=lease.company, lease=lease, due_date=cursor, amount=lease.rent_amount,
@@ -39,6 +42,10 @@ def allocate_receipt(receipt_id, allocations):
         raise ValidationError("Posted receipts cannot be changed.")
     if receipt.tenant.company_id != receipt.company_id:
         raise ValidationError("Receipt tenant belongs to another company.")
+    if receipt.amount <= 0:
+        raise ValidationError("Receipt amount must be positive.")
+    if not allocations:
+        raise ValidationError("At least one allocation is required.")
     if receipt.allocations.exists():
         raise ValidationError("Receipt already has allocations.")
     total, prepared, seen = Decimal("0.00"), [], set()
@@ -51,7 +58,12 @@ def allocate_receipt(receipt_id, allocations):
         charge = LeaseCharge.objects.select_for_update().select_related("lease").get(pk=charge_id)
         if charge.company_id != receipt.company_id or charge.lease.tenant_id != receipt.tenant_id:
             raise ValidationError("Charge does not belong to this receipt tenant/company.")
-        if charge.status == "void": raise ValidationError("Cannot allocate to a void charge.")
+        if charge.currency.upper() != charge.lease.currency.upper():
+            raise ValidationError("Charge currency must match its lease currency.")
+        if receipt.currency.upper() != charge.currency.upper():
+            raise ValidationError("Receipt and charge currencies must match.")
+        if charge.status == "void":
+            raise ValidationError("Cannot allocate to a void charge.")
         allocated = charge.allocations.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
         if allocated + amount > charge.amount: raise ValidationError("Allocation exceeds outstanding charge balance.")
         total += amount

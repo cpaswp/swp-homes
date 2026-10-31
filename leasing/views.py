@@ -68,8 +68,9 @@ def receipt_create(request):
         messages.error(request,'ليس لديك صلاحية إنشاء سندات القبض.'); return redirect('receipt_list')
     form=ReceiptForm(request.POST or None,company=m.company,language=lang)
     if request.method=='POST' and form.is_valid():
-        receipt=form.save(commit=False); receipt.company=m.company; receipt.save()
-        AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.create',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'receipt_number':receipt.receipt_number,'amount':str(receipt.amount)})
+        with transaction.atomic():
+            receipt=form.save(commit=False); receipt.company=m.company; receipt.save()
+            AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.create',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'receipt_number':receipt.receipt_number,'amount':str(receipt.amount)})
         messages.success(request,'تم إنشاء سند القبض كمسودة. راجعه ثم رحّله محاسبيًا.'); return redirect('receipt_list')
     return render(request,'leasing/receipt_form.html',{'language':lang,'active_company':m.company,'form':form})
 
@@ -82,8 +83,11 @@ def receipt_post(request,receipt_id):
         messages.error(request,'ليس لديك صلاحية ترحيل سندات القبض.'); return redirect('receipt_list')
     receipt=get_object_or_404(Receipt,pk=receipt_id,company=m.company)
     try:
-        entry=post_receipt(receipt.pk)
-        AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.post',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'journal_entry':entry.entry_number})
+        # Posting and its audit trail are one unit: never commit a financial
+        # posting if the corresponding audit event cannot be recorded.
+        with transaction.atomic():
+            entry=post_receipt(receipt.pk)
+            AuditEvent.objects.create(company=m.company,actor=request.user,action='receipt.post',model_label='leasing.Receipt',object_id=str(receipt.pk),details={'journal_entry':entry.entry_number})
         messages.success(request,f'تم ترحيل السند إلى القيد {entry.entry_number}.')
     except (ValidationError,ValueError) as exc: messages.error(request,str(exc))
     return redirect('receipt_list')
