@@ -142,3 +142,64 @@ def test_property_and_audit_event_are_saved_atomically(client, monkeypatch):
         })
 
     assert not Property.objects.filter(company=company, code="AT-1").exists()
+
+
+@pytest.mark.django_db
+def test_property_update_is_company_scoped_and_audited(client):
+    from core.models import AuditEvent
+    user = get_user_model().objects.create_user(username="edit-property", password="strong-test-password")
+    company = Company.objects.create(name="Edit company")
+    other = Company.objects.create(name="Other edit company")
+    CompanyMembership.objects.create(company=company, user=user, role="owner")
+    own = Property.objects.create(company=company, code="EP-1", name="Old", kind="residential", ownership_type="company_owned")
+    foreign = Property.objects.create(company=other, code="EP-2", name="Foreign", kind="residential", ownership_type="company_owned")
+    client.force_login(user)
+    response = client.post(reverse("property_update", args=[own.pk]), {
+        "code": "EP-1", "name": "Updated", "kind": "residential",
+        "ownership_type": "company_owned", "currency": "EGP", "is_active": "on",
+    })
+    assert response.status_code == 302
+    own.refresh_from_db()
+    assert own.name == "Updated"
+    assert AuditEvent.objects.filter(company=company, action="property.update", object_id=str(own.pk)).exists()
+    assert client.get(reverse("property_update", args=[foreign.pk])).status_code == 404
+
+
+@pytest.mark.django_db
+def test_viewer_cannot_update_property(client):
+    user = get_user_model().objects.create_user(username="viewer-edit", password="strong-test-password")
+    company = Company.objects.create(name="Viewer edit company")
+    CompanyMembership.objects.create(company=company, user=user, role="viewer")
+    prop = Property.objects.create(company=company, code="VE-1", name="Original", kind="residential", ownership_type="company_owned")
+    client.force_login(user)
+    response = client.post(reverse("property_update", args=[prop.pk]), {
+        "code": "VE-1", "name": "Changed", "kind": "residential",
+        "ownership_type": "company_owned", "currency": "EGP", "is_active": "on",
+    })
+    prop.refresh_from_db()
+    assert response.status_code == 302
+    assert prop.name == "Original"
+
+
+@pytest.mark.django_db
+def test_unit_update_is_company_scoped_and_audited(client):
+    from core.models import AuditEvent
+    user = get_user_model().objects.create_user(username="edit-unit", password="strong-test-password")
+    company = Company.objects.create(name="Unit edit company")
+    other = Company.objects.create(name="Other unit company")
+    CompanyMembership.objects.create(company=company, user=user, role="owner")
+    prop = Property.objects.create(company=company, code="UP-1", name="Own", kind="residential", ownership_type="company_owned")
+    foreign_prop = Property.objects.create(company=other, code="UP-2", name="Foreign", kind="residential", ownership_type="company_owned")
+    unit = Unit.objects.create(company=company, property=prop, code="UU-1", kind="apartment")
+    client.force_login(user)
+    response = client.post(reverse("unit_update", args=[unit.pk]), {
+        "property": foreign_prop.pk, "code": "UU-1", "kind": "apartment", "status": "available",
+    })
+    assert response.status_code == 200
+    unit.refresh_from_db()
+    assert unit.property_id == prop.pk
+    response = client.post(reverse("unit_update", args=[unit.pk]), {
+        "property": prop.pk, "code": "UU-1", "kind": "apartment", "status": "available",
+    })
+    assert response.status_code == 302
+    assert AuditEvent.objects.filter(company=company, action="unit.update", object_id=str(unit.pk)).exists()
