@@ -154,3 +154,49 @@ def unit_create(request):
     return render(request, "core/unit_form.html", {
         "language": language, "active_company": membership.company, "form": form,
     })
+
+
+@login_required
+def property_update(request, property_id):
+    membership = _active_membership(request)
+    language = (get_language() or "ar")[:2]
+    if membership is None:
+        return render(request, "core/no_company.html", {"language": language})
+    if membership.role not in ("owner", "admin", "property_manager"):
+        messages.error(request, "ليس لديك صلاحية تعديل العقارات.")
+        return redirect("property_list")
+    obj = get_object_or_404(Property, pk=property_id, company=membership.company)
+    form = PropertyForm(request.POST or None, instance=obj, company=membership.company, language=language)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            obj = form.save()
+            AuditEvent.objects.create(company=membership.company, actor=request.user,
+                action="property.update", model_label="core.Property", object_id=str(obj.pk),
+                details={"code": obj.code, "name": obj.name})
+        messages.success(request, "تم تحديث العقار بنجاح.")
+        return redirect("property_list")
+    return render(request, "core/property_form.html", {"language": language,
+        "active_company": membership.company, "form": form, "editing": True})
+
+
+@login_required
+def unit_update(request, unit_id):
+    membership = _active_membership(request)
+    language = (get_language() or "ar")[:2]
+    if membership is None:
+        return render(request, "core/no_company.html", {"language": language})
+    if membership.role not in ("owner", "admin", "property_manager"):
+        messages.error(request, "ليس لديك صلاحية تعديل الوحدات.")
+        return redirect("unit_list")
+    obj = get_object_or_404(Unit, pk=unit_id, company=membership.company)
+    form = UnitForm(request.POST or None, instance=obj, company=membership.company, language=language)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            obj = form.save()
+            AuditEvent.objects.create(company=membership.company, actor=request.user,
+                action="unit.update", model_label="core.Unit", object_id=str(obj.pk),
+                details={"code": obj.code, "property_id": obj.property_id})
+        messages.success(request, "تم تحديث الوحدة بنجاح.")
+        return redirect("unit_list")
+    return render(request, "core/unit_form.html", {"language": language,
+        "active_company": membership.company, "form": form, "editing": True})
