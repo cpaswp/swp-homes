@@ -1,4 +1,5 @@
 import hashlib
+from decimal import Decimal
 import secrets
 import time
 
