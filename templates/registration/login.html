@@ -30,7 +30,7 @@
         {{ form.username }}
         <label for="id_password">كلمة المرور</label>
         <div class="homes-password-wrap">{{ form.password }}<button type="button" class="homes-show-password" aria-label="إظهار كلمة المرور" onclick="const p=document.getElementById('id_password');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'◉':'◎'">◉</button></div>
-        <div class="homes-login-options"><label class="homes-remember"><input type="checkbox" name="remember_me" value="1"> تذكرني</label><a href="{% url 'password_reset' %}">نسيت كلمة المرور؟</a></div>
+        <div class="homes-login-options"><label class="homes-remember"><input type="checkbox" name="remember_me" value="1"> تذكرني</label><span>لاستعادة كلمة المرور تواصل مع مدير النظام</span></div>
         <button class="homes-login-submit" type="submit"><span>دخول آمن</span><b>←</b></button>
       </form>
       <div class="homes-login-security">اتصال آمن · الوصول للمستخدمين المصرح لهم فقط</div>
