@@ -1,9 +1,40 @@
 {% load static %}
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#05080f"><title>دخول آمن · SWP-HOMES</title><link rel="stylesheet" href="{% static 'css/app.css' %}"></head>
-<body class="login-body"><main class="login-card">
-  <div class="login-platform"><img src="{% static 'images/swp-logo.png' %}" alt="SWP" class="login-logo"><strong>SWP-HOMES</strong></div>
-  <h1 class="login-title">تسجيل الدخول</h1><p class="login-intro">منصة إدارة الأملاك والحسابات</p>
-  {% if form.errors %}<div class="form-error">اسم المستخدم أو كلمة المرور غير صحيحة.</div>{% endif %}
-  <form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><label for="id_username">اسم المستخدم</label>{{ form.username }}<label for="id_password">كلمة المرور</label>{{ form.password }}<button class="primary-button" type="submit">دخول آمن</button></form>
-  <p class="login-footnote">يقتصر الوصول على المستخدمين المصرح لهم.</p>
-</main></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#061b45">
+  <title>SWP-HOMES | تسجيل الدخول</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="login-body">
+  <main class="homes-login-shell">
+    <section class="homes-login-brand">
+      <img src="{% static 'IMAGES/swp-logo.png' %}" alt="SWP" class="homes-login-logo">
+      <div class="homes-brand-kicker">SMART TECHNOLOGY WITH PROFESSIONAL</div>
+      <div class="homes-brand-product">SWP-HOMES</div>
+      <div class="homes-brand-ar">إدارة الأملاك والعقارات باحترافية</div>
+      <p>منصة موحدة لإدارة العقارات والوحدات والعقود والتحصيلات والتقارير.</p>
+      <div class="homes-brand-line"></div>
+      <div class="homes-brand-features">
+        <span>أمان متقدم</span><span>تحليلات ذكية</span><span>إدارة سحابية</span><span>دعم احترافي</span>
+      </div>
+    </section>
+    <section class="homes-login-panel">
+      <div class="homes-login-heading"><span class="homes-login-icon">⌂</span><div><h1>تسجيل الدخول</h1><small>Login to SWP-HOMES</small></div></div>
+      {% if form.errors %}<div class="form-error" role="alert">اسم المستخدم أو كلمة المرور غير صحيحة.</div>{% endif %}
+      {% if next %}<input type="hidden" form="homes-login-form" name="next" value="{{ next }}">{% endif %}
+      <form id="homes-login-form" method="post" autocomplete="on">
+        {% csrf_token %}
+        <label for="id_username">البريد الإلكتروني أو اسم المستخدم</label>
+        {{ form.username }}
+        <label for="id_password">كلمة المرور</label>
+        <div class="homes-password-wrap">{{ form.password }}<button type="button" class="homes-show-password" aria-label="إظهار كلمة المرور" onclick="const p=document.getElementById('id_password');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'◉':'◎'">◉</button></div>
+        <div class="homes-login-options"><label class="homes-remember"><input type="checkbox" name="remember_me" value="1"> تذكرني</label><a href="{% url 'password_reset' %}">نسيت كلمة المرور؟</a></div>
+        <button class="homes-login-submit" type="submit"><span>دخول آمن</span><b>←</b></button>
+      </form>
+      <div class="homes-login-security">اتصال آمن · الوصول للمستخدمين المصرح لهم فقط</div>
+    </section>
+    <footer class="homes-login-footer">© 2026 SWP-HOMES · Smart Technology with Professional</footer>
+  </main>
+</body></html>
