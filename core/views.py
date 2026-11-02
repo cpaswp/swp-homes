@@ -5,7 +5,7 @@ import time
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.db.models import Sum, Q
@@ -32,7 +32,7 @@ def _otp_cleanup(request):
 def login_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
-    stage = "verify" if request.session.get("admin_otp_hash") else "credentials"
+    stage = "verify" if request.session.get("admin_otp_hash") else "username"
     if request.method == "POST" and request.POST.get("otp"):
         stage = "verify"
         expected = request.session.get("admin_otp_hash")
@@ -77,27 +77,23 @@ def login_view(request):
             stage = "credentials"
     elif request.method == "POST":
         username = request.POST.get("username", "").strip()
-        password = request.POST.get("password", "")
-        user = authenticate(request, username=username, password=password)
-        if user is None or not user.is_active:
-            messages.error(request, "اسم المستخدم أو كلمة المرور غير صحيحة.")
-        elif user.is_superuser or user.is_staff:
+        from django.contrib.auth import get_user_model
+        user = get_user_model().objects.filter(username__iexact=username, is_active=True, is_staff=True).first()
+        if user is None:
+            messages.error(request, "إذا كان الحساب حساب مدير نظام نشطًا، فسيتم إرسال رمز التحقق إلى البريد المعتمد.")
+        else:
             code = f"{secrets.randbelow(1000000):06d}"
             request.session["admin_otp_user_id"] = user.pk
             request.session["admin_otp_hash"] = hashlib.sha256(code.encode()).hexdigest()
             request.session["admin_otp_expires"] = time.time() + 300
             request.session["admin_otp_attempts"] = 0
             try:
-                send_mail("رمز الدخول إلى SWP-HOMES", f"رمز التحقق: {code}\nصالح لمدة 5 دقائق. لا تشاركه مع أي شخص.", settings.DEFAULT_FROM_EMAIL, [settings.SWP_HOMES_ADMIN_EMAIL], fail_silently=False)
+                send_mail("رمز الدخول إلى SWP-HOMES", f"رمز التحقق: {code}\\nصالح لمدة 5 دقائق. لا تشاركه مع أي شخص.", settings.DEFAULT_FROM_EMAIL, [settings.SWP_HOMES_ADMIN_EMAIL], fail_silently=False)
                 messages.success(request, "تم إرسال رمز التحقق إلى بريد مدير النظام.")
                 stage = "verify"
             except Exception:
                 _otp_cleanup(request)
                 messages.error(request, "تعذر إرسال رمز التحقق. تأكد من إعداد البريد الإلكتروني.")
-        else:
-            login(request, user)
-            request.session.set_expiry(60 * 60 * 10)
-            return redirect(request.POST.get("next") or settings.LOGIN_REDIRECT_URL)
     return render(request, "registration/login.html", {"otp_stage": stage, "next": request.POST.get("next", request.GET.get("next", ""))})
 
 
