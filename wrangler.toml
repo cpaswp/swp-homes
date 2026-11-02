@@ -1,0 +1,9 @@
+name = "swp-homes-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-25"
+
+[vars]
+APP_ENV = "development"
+
+# Configure DATABASE_URL as a secret in the Worker dashboard.
+# Never commit Neon credentials or enable paid products from this repository.
