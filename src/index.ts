@@ -39,7 +39,7 @@ function ttl(env: Env["Bindings"]): number {
   const parsed = Number(env.OTP_EXPIRY_SECONDS);
   return Number.isInteger(parsed) && parsed >= 60 && parsed <= 900 ? parsed : DEFAULT_OTP_TTL;
 }
-async function ensureTables(sql: ReturnType<typeof neon>) {
+async function ensureTables(sql: any) {
   await sql`CREATE TABLE IF NOT EXISTS swp_admin_otp_challenges (
     challenge_id text PRIMARY KEY,
     otp_digest text NOT NULL,
