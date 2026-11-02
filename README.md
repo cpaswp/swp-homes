@@ -76,3 +76,12 @@ See `PHASE5_REPORTS_STATUS_AR.md`. Reports are derived from posted journals and 
 - الملفات المرفوعة محليًا داخل الحاوية ليست دائمة؛ يلزم تخزين دائم لشعارات الشركات قبل الإنتاج.
 - نجاح CI لا يغني عن اختبار الخدمة بعد النشر ولا يعني اكتمال جاهزية النظام المحاسبية.
 - لا تضع الأسرار أو رابط قاعدة البيانات في المستودع أو السجلات.
+
+
+## تفعيل رمز OTP لمدير النظام
+- عند نجاح كلمة المرور لحساب Django من نوع staff أو superuser، يرسل النظام رمزًا من 6 أرقام إلى `SWP_HOMES_ADMIN_EMAIL` (الافتراضي `cpaswp@gmail.com`). لا تكتمل جلسة المدير قبل التحقق.
+- الرمز صالح 5 دقائق، مع 5 محاولات كحد أقصى، ويُخزن بصمة SHA-256 في جلسة الخادم ولا يُخزن كنص صريح.
+- يلزم ضبط إعدادات SMTP في بيئة تشغيل Django: `EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`, `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_USE_TLS=True`, `EMAIL_HOST_USER=cpaswp@gmail.com`, `EMAIL_HOST_PASSWORD` (كلمة مرور تطبيق Google محفوظة كسر)، و`DEFAULT_FROM_EMAIL=cpaswp@gmail.com`.
+- لا تضع كلمة مرور Gmail أو أي سر في Git أو داخل المحادثة. أنشئ App Password من حساب Google بعد تفعيل التحقق بخطوتين، ثم خزّنها في Secrets/Environment Variables لخدمة Django نفسها. أسرار GitHub Actions وحدها لا تصل تلقائيًا إلى خدمة التشغيل.
+- اختبر إرسال واستلام البريد قبل إتاحة دخول المدير. في حال فشل SMTP، يمنع النظام دخول المدير بدل تجاوز OTP.
+- الجلسة العادية للموظف لا تستخدم هذا التحدي الإضافي؛ يظل دخولها خاضعًا للمصادقة والصلاحيات الحالية.
