@@ -6,7 +6,7 @@ describe("SWP-HOMES Worker health", () => {
     const response = await worker.fetch(
       new Request("https://example.test/health"),
       { APP_ENV: "test" },
-      {} as ExecutionContext
+      {} as never
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -19,7 +19,7 @@ describe("SWP-HOMES Worker health", () => {
     const response = await worker.fetch(
       new Request("https://example.test/api/v1/health/database"),
       { APP_ENV: "test" },
-      {} as ExecutionContext
+      {} as never
     );
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ status: "not_configured" });
