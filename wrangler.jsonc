@@ -11,8 +11,12 @@
       "**/__pycache__/**",
       "**/tests/**",
       "**/test/**",
+      "**/test_*.py",
+      "**/*_test.py",
+      "**/*_tests.py",
+      "**/*.pyi",
       "**/docs/**",
-      "**/*.pyi"
+      "**/examples/**"
     ]
   }
 }
