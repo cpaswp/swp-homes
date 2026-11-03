@@ -36,5 +36,15 @@ jobs:
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py migrate --noinput
       - run: pytest -q
+      - name: Set up Node.js for Wrangler
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Set up uv for Python Workers
+        uses: astral-sh/setup-uv@v5
+      - name: Install Wrangler dependencies
+        run: npm install
+      - name: Validate Cloudflare Python Worker bundle (no deployment)
+        run: uvx --from workers-py pywrangler deploy --dry-run
       - name: Build production Docker image
         run: docker build --tag swp-homes:ci .
