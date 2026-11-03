@@ -22,6 +22,8 @@
       "**/*.rst",
       "**/LICENSE*",
       "**/COPYING*",
+      "**/locale/[!a]*/**",
+      "**/locale/a[!r]*/**",
       "**/psycopg/py.typed",
       "**/psycopg*/tests/**",
       "**/psycopg*/docs/**"
