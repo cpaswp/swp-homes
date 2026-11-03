@@ -16,7 +16,12 @@
       "**/*_tests.py",
       "**/*.pyi",
       "**/docs/**",
-      "**/examples/**"
+      "**/doc/**",
+      "**/examples/**",
+      "**/*.md",
+      "**/*.rst",
+      "**/LICENSE*",
+      "**/COPYING*"
     ]
   }
 }
