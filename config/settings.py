@@ -13,7 +13,7 @@ CSRF_TRUSTED_ORIGINS = [v.strip() for v in os.getenv("DJANGO_CSRF_TRUSTED_ORIGIN
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
-    "rest_framework", "core.apps.CoreConfig", "accounting.apps.AccountingConfig",
+    "core.apps.CoreConfig", "accounting.apps.AccountingConfig",
     "leasing.apps.LeasingConfig",
 ]
 MIDDLEWARE = [
@@ -71,6 +71,3 @@ if os.getenv("DJANGO_ENV", "development").lower() == "production":
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-REST_FRAMEWORK = {"DEFAULT_AUTHENTICATION_CLASSES":[
-"rest_framework.authentication.SessionAuthentication","rest_framework.authentication.BasicAuthentication"],
-"DEFAULT_PERMISSION_CLASSES":["rest_framework.permissions.IsAuthenticated"]}
