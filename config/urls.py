@@ -1,10 +1,9 @@
 from django.contrib import admin
-from django.contrib.auth import views as auth_views
 from django.urls import path
 from django.views.i18n import set_language
 from accounting.views import trial_balance_view, income_statement_view, balance_sheet_view, general_ledger_view
 
-from core.views import dashboard, health, property_list, property_create, unit_list, unit_create
+from core.views import dashboard, health, property_list, property_create, unit_list, unit_create, login_view, logout_view
 from leasing.views import lease_list, lease_create, lease_charges, receipt_list, receipt_create, receipt_post
 
 urlpatterns = [
@@ -13,8 +12,8 @@ urlpatterns = [
     path("reports/income-statement/", income_statement_view, name="income_statement"),
     path("reports/balance-sheet/", balance_sheet_view, name="balance_sheet"),
     path("reports/general-ledger/", general_ledger_view, name="general_ledger"),
-    path("accounts/login/", auth_views.LoginView.as_view(template_name="registration/login.html"), name="login"),
-    path("accounts/logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("accounts/login/", login_view, name="login"),
+    path("accounts/logout/", logout_view, name="logout"),
     path("i18n/setlang/", set_language, name="set_language"),
     path("admin/", admin.site.urls),
     path("properties/", property_list, name="property_list"),
