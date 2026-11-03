@@ -11,7 +11,9 @@ class Company(TimeStampedModel):
     name = models.CharField(max_length=200)
     legal_name = models.CharField(max_length=250, blank=True)
     tax_number = models.CharField(max_length=50, blank=True)
-    logo = models.ImageField(upload_to="company-logos/", blank=True, null=True)
+    # FileField preserves existing logo uploads while avoiding Pillow's native
+    # image-processing dependency in the Cloudflare Python Worker bundle.
+    logo = models.FileField(upload_to="company-logos/", blank=True, null=True)
     base_currency = models.CharField(max_length=3, default="EGP")
     is_active = models.BooleanField(default=True)
     def __str__(self): return self.name
