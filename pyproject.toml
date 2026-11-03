@@ -1,0 +1,19 @@
+[project]
+name = "swp-homes"
+version = "0.1.0"
+description = "SWP-HOMES property management Django application running on Cloudflare Python Workers"
+requires-python = ">=3.13"
+dependencies = [
+  "Django>=5.2,<5.3",
+  "djangorestframework>=3.16,<3.17",
+  "dj-database-url>=2.3,<3",
+  "python-dotenv>=1.0,<2",
+  "whitenoise>=6.9,<7",
+  "Pillow>=11.0,<13.0"
+]
+
+[dependency-groups]
+dev = [
+  "workers-py",
+  "workers-runtime-sdk"
+]
