@@ -4,5 +4,15 @@
   "main": "index.py",
   "compatibility_date": "2026-11-03",
   "compatibility_flags": ["python_workers"],
-  "workers_dev": true
+  "workers_dev": true,
+  "python_modules": {
+    "exclude": [
+      "**/*.pyc",
+      "**/__pycache__/**",
+      "**/tests/**",
+      "**/test/**",
+      "**/docs/**",
+      "**/*.pyi"
+    ]
+  }
 }
