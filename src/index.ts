@@ -22,9 +22,17 @@ function cookieOptions(maxAge: number) {
   return `Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
 }
 function randomDigits(): string {
-  const bytes = new Uint8Array(OTP_LENGTH);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => String(b % 10)).join("");
+  // Rejection sampling avoids modulo bias (250 is divisible by 10).
+  const digits: string[] = [];
+  while (digits.length < OTP_LENGTH) {
+    const bytes = new Uint8Array(OTP_LENGTH - digits.length);
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      if (byte < 250) digits.push(String(byte % 10));
+      if (digits.length === OTP_LENGTH) break;
+    }
+  }
+  return digits.join("");
 }
 function randomToken(): string {
   const bytes = new Uint8Array(32);
@@ -156,6 +164,22 @@ app.post("/api/v1/admin/otp/verify", async (c) => {
   } catch {
     return c.json({ error: "otp_verification_failed" }, 503);
   }
+});
+
+app.post("/api/v1/admin/logout", async (c) => {
+  const token = c.req.header("Cookie")?.split(";").map((part) => part.trim())
+    .find((part) => part.startsWith(`${SESSION_COOKIE}=`))?.slice(SESSION_COOKIE.length + 1);
+  if (token && c.env.DATABASE_URL) {
+    try {
+      const sql = neon(c.env.DATABASE_URL);
+      await sql`DELETE FROM swp_admin_sessions WHERE token_digest=${await digest(token)}`;
+    } catch {
+      return c.json({ error: "logout_failed" }, 503);
+    }
+  }
+  c.header("Set-Cookie", `${SESSION_COOKIE}=; ${cookieOptions(0)}`);
+  c.header("Cache-Control", "no-store");
+  return c.json({ status: "logged_out" });
 });
 
 app.get("/api/v1/admin/session", async (c) => {
