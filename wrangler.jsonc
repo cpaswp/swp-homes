@@ -21,7 +21,13 @@
       "**/*.md",
       "**/*.rst",
       "**/LICENSE*",
-      "**/COPYING*"
+      "**/COPYING*",
+      "**/django/contrib/**/locale/**",
+      "**/django/conf/locale/**",
+      "**/django/**/locale/**",
+      "**/psycopg/py.typed",
+      "**/psycopg*/tests/**",
+      "**/psycopg*/docs/**"
     ]
   }
 }
