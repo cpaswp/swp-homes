@@ -76,3 +76,19 @@ See `PHASE5_REPORTS_STATUS_AR.md`. Reports are derived from posted journals and 
 - الملفات المرفوعة محليًا داخل الحاوية ليست دائمة؛ يلزم تخزين دائم لشعارات الشركات قبل الإنتاج.
 - نجاح CI لا يغني عن اختبار الخدمة بعد النشر ولا يعني اكتمال جاهزية النظام المحاسبية.
 - لا تضع الأسرار أو رابط قاعدة البيانات في المستودع أو السجلات.
+
+
+## Cloudflare Workers (Python/Django) build correction
+
+This repository includes a Python Workers WSGI entrypoint and Wrangler configuration:
+- `src/index.py` — Django WSGI adapter for Cloudflare Python Workers.
+- `pyproject.toml` — Python Worker package dependencies.
+- `wrangler.jsonc` — Worker name, entrypoint, and Python compatibility flag.
+- `package.json` — Node/Wrangler project metadata so Cloudflare's configured `npm install` no longer fails with a missing package.json.
+
+**Cloudflare dashboard build settings must also be changed** (these are outside Git):
+- Build command: `npm install` (now valid)
+- Deploy command: `uvx --from workers-py pywrangler deploy` (not `npx wrangler deploy`)
+- Root directory: `/`
+
+Configure Worker secrets/environment for Django (`DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`, `DJANGO_ENV`). The current Django database config is still PostgreSQL/Neon-oriented and must be validated through a Cloudflare Hyperdrive connection before production. This scaffold fixes the missing Node package/build bootstrap; it does not by itself prove a working Neon connection, migrations, durable media, or production readiness.
