@@ -1,0 +1,14 @@
+{
+  "name": "swp-homes-cloudflare-worker",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloudflare Workers deployment tooling for SWP-HOMES Django",
+  "scripts": {
+    "deploy": "uvx --from workers-py pywrangler deploy",
+    "dev": "uvx --from workers-py pywrangler dev",
+    "check": "uvx --from workers-py pywrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
